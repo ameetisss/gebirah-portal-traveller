@@ -3,68 +3,15 @@ import { useLocation } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
-
-const REQUESTER_NAV_ITEMS = [
-  {
-    path: "/requester",
-    label: "My requests",
-    match: (location) => location.pathname === "/requester" && location.hash !== "#new-request",
-  },
-  {
-    path: "/requester",
-    hash: "#new-request",
-    label: "New request",
-    match: (location) => location.pathname === "/requester" && location.hash === "#new-request",
-  },
-  { path: "/request-history", label: "History" },
-];
-
-const REQUEST_STEPS = {
-  inTransit: [
-    { label: "Request submitted", done: true },
-    { label: "Approved by coordinator", done: true },
-    { label: "Matched to traveller: Sarah L.", done: true },
-    { label: "Delivery to you pending", done: false },
-  ],
-  waiting: [
-    { label: "Request submitted", done: true },
-    { label: "Awaiting approval", done: false },
-    { label: "Awaiting traveller match", done: false },
-    { label: "Airport pickup pending", done: false },
-    { label: "Delivery to you pending", done: false },
-  ],
-};
-
-const INITIAL_REQUESTS = [
-  {
-    id: 1,
-    title: "Medication",
-    meta: "0.5 kg · Gaza · Submitted 10 Mar",
-    status: "In transit",
-    statusColor: "#3C7F2E",
-    statusBg: "#E5F3D9",
-    steps: REQUEST_STEPS.inTransit,
-    arrival: "Expected arrival: 15 Mar · SQ 417 via Amman",
-  },
-  {
-    id: 2,
-    title: "Clothing",
-    meta: "2 kg · Gaza · Submitted 8 Mar",
-    status: "Waiting",
-    statusColor: "#8A5A16",
-    statusBg: "#F8EBD3",
-    steps: REQUEST_STEPS.waiting,
-    arrival: "Coordinator is sourcing a traveller match",
-  },
-];
-
-const EMPTY_FORM = {
-  description: "",
-  weight: "",
-  urgency: "High",
-  destination: "",
-  reason: "",
-};
+import {
+  createPlaceholderRequesterRequest,
+  formatRequesterArrival,
+  formatRequesterMeta,
+  placeholderRequesterRequests,
+  requesterFormDefaults,
+  requesterNavItems,
+  requesterStatusMap,
+} from "../data/requesterData";
 
 function RequestStepper({ steps }) {
   return (
@@ -116,6 +63,8 @@ function RequestStepper({ steps }) {
 }
 
 function RequestCard({ request }) {
+  const status = requesterStatusMap[request.statusKey];
+
   return (
     <Card style={{ background: "#F8F4ED", border: "1px solid #E7DED0", borderRadius: "20px" }}>
       <div style={{ padding: "28px" }}>
@@ -124,9 +73,9 @@ function RequestCard({ request }) {
             <div style={{ fontSize: "19px", fontWeight: "600", letterSpacing: "-0.03em", color: theme.textPrimary, marginBottom: "4px" }}>
               {request.title}
             </div>
-            <div style={{ fontSize: "14px", color: "#776F63" }}>{request.meta}</div>
+            <div style={{ fontSize: "14px", color: "#776F63" }}>{formatRequesterMeta(request)}</div>
           </div>
-          <Badge color={request.statusColor} bg={request.statusBg}>{request.status}</Badge>
+          <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
         </div>
 
         <RequestStepper steps={request.steps} />
@@ -143,7 +92,7 @@ function RequestCard({ request }) {
             border: "1px solid #E3D8C7",
           }}
         >
-          {request.arrival}
+          {formatRequesterArrival(request.arrival)}
         </div>
       </div>
     </Card>
@@ -153,8 +102,8 @@ function RequestCard({ request }) {
 export default function RequesterPortal() {
   const location = useLocation();
   const newRequestRef = useRef(null);
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [requests, setRequests] = useState(placeholderRequesterRequests);
+  const [form, setForm] = useState(requesterFormDefaults);
 
   useEffect(() => {
     if (location.hash === "#new-request") {
@@ -170,22 +119,8 @@ export default function RequesterPortal() {
     event.preventDefault();
     if (!form.description || !form.weight || !form.destination) return;
 
-    setRequests((current) => [
-      {
-        id: Date.now(),
-        title: form.description,
-        meta: `${form.weight} kg · ${form.destination} · Submitted today`,
-        status: "Waiting",
-        statusColor: "#8A5A16",
-        statusBg: "#F8EBD3",
-        steps: REQUEST_STEPS.waiting,
-        arrival: form.reason
-          ? `Reason noted: ${form.reason}`
-          : `Urgency marked ${form.urgency.toLowerCase()}. Coordinator is sourcing a traveller match`,
-      },
-      ...current,
-    ]);
-    setForm(EMPTY_FORM);
+    setRequests((current) => [createPlaceholderRequesterRequest(form), ...current]);
+    setForm(requesterFormDefaults);
   }
 
   const isValid = form.description && form.weight && form.destination;
@@ -193,7 +128,7 @@ export default function RequesterPortal() {
   return (
     <div style={{ minHeight: "100vh", background: "#FFFFFF", color: theme.textPrimary, fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif" }}>
       <Topbar
-        navItems={REQUESTER_NAV_ITEMS}
+        navItems={requesterNavItems}
         homePath="/requester"
         brandLabel="Gebirah portal"
         logoBg="#ECE8FF"
