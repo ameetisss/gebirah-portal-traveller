@@ -1,13 +1,14 @@
 import { createContext, useContext, useState } from "react";
 
 export const STAGES = {
-  REGISTER:  "register",
-  AWAITING:  "awaiting",
-  MATCH:     "match",
-  HANDOVER:  "handover",   // pre-departure pickup
-  DEPARTED:  "departed",   // boarded, en route
-  ARRIVAL:   "arrival",    // landed, meet local volunteer
-  COMPLETED: "completed",  // request fully done
+  REGISTER:     "register",
+  AWAITING:     "awaiting",
+  MATCH:        "match",
+  HANDOVER:     "handover",
+  DEPARTED:     "departed",
+  ARRIVAL:      "arrival",
+  COMPLETED:    "completed",
+  NO_VOLUNTEER: "no_volunteer",
 };
 
 export const DEMO_MATCH = {
@@ -69,7 +70,12 @@ export function TripProvider({ children }) {
   // Add a new trip (replaces setTripData + setStage(AWAITING))
   function addTrip(formData) {
     const id = Date.now();
-    setTrips(prev => [...prev, { id, ...formData, stage: STAGES.AWAITING }]);
+    // Check day of week from the departure date (0=Sun, 1=Mon, ..., 6=Sat)
+    const dayOfWeek = formData.date ? new Date(formData.date).getDay() : new Date().getDay();
+    // Mon(1) to Thu(4) = volunteers available; Fri(5), Sat(6), Sun(0) = no volunteers
+    const volunteersAvailable = dayOfWeek >= 1 && dayOfWeek <= 4;
+    const initialStage = volunteersAvailable ? STAGES.AWAITING : STAGES.NO_VOLUNTEER;
+    setTrips(prev => [...prev, { id, ...formData, stage: initialStage }]);
     setActiveTripId(id);
   }
 

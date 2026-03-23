@@ -46,7 +46,12 @@ uvicorn main:app --reload
 - `GET /api/health`: Health check.
 - `GET /api/csv-head`: Retrieve the first few rows of a CSV file (default 5).
 - `POST /api/fetch-flights`: Trigger flight fetching (requires valid SerpApi key).
-- `POST /api/flight-departure`: Retrieve a flight's departure time from local CSV data.
+- POST /api/flight-departure: Retrieve a flight's departure time from local CSV data.
+
+## Volunteer Availability
+The portal simulates volunteer availability based on the departure date of your trip:
+- **Monday – Thursday**: Volunteers are available, and the trip will proceed to the matching flow.
+- **Friday – Sunday**: No volunteers are available. A "Thank You" message will be displayed with a link to our Facebook page.
 
 ## Accessing the Dashboard
 

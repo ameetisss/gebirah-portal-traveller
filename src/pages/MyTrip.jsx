@@ -132,6 +132,60 @@ function RegisterView({ onSubmit }) {
   );
 }
 
+// ── No Volunteer Available ─────────────────────────────────────
+
+function NoVolunteerView({ onReset }) {
+  return (
+    <div style={{ maxWidth: "480px", margin: "0 auto", textAlign: "center" }}>
+      <div style={{
+        width: "72px", height: "72px", borderRadius: "50%",
+        background: theme.amberDim, border: `2px solid ${theme.amber}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        margin: "0 auto 24px", fontSize: "32px"
+      }}>
+        🤲
+      </div>
+
+      <div style={{ fontSize: "22px", fontWeight: "700", letterSpacing: "-0.5px", marginBottom: "12px" }}>
+        Thank You for Volunteering!
+      </div>
+      <div style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: "1.8", marginBottom: "28px" }}>
+        Unfortunately, we do not have any free volunteers during this timing.
+        Thank you so much for your interest — we truly appreciate it!<br /><br />
+        It would mean a lot if you followed us to stay in the loop about future opportunities. 🌟
+      </div>
+
+      <a
+        href="https://www.facebook.com/HELP.GEBIRAH/"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          padding: "12px 24px", borderRadius: "8px",
+          background: "#1877F2", color: "#fff",
+          fontWeight: "600", fontSize: "14px",
+          textDecoration: "none",
+          marginBottom: "16px",
+          transition: "opacity 0.15s",
+        }}
+        onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
+        onMouseOut={e => e.currentTarget.style.opacity = "1"}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+          <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.887v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+        </svg>
+        Follow us on Facebook
+      </a>
+
+      <div>
+        <button style={{ ...btn("ghost"), marginTop: "8px" }} onClick={onReset}>
+          ← Register another trip
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Stage 2: Awaiting Match ────────────────────────────────────
 
 function AwaitingView({ trip, onMatchFound }) {
@@ -221,7 +275,7 @@ function MatchView({ trip, match, onAccept, onDecline }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
               {[
                 { label: "Weight",       value: `${match.weight} kg` },
-                { label: "Destination",  value: match.destination },
+                { label: "Destination",  value: trip.destination },
                 { label: "Requested by", value: match.requester },
               ].map(d => (
                 <div key={d.label}>
@@ -491,10 +545,11 @@ function CompletedView({ trip, handover, onReset }) {
 const STAGE_LABEL = {
   [STAGES.AWAITING]:  "Awaiting match",
   [STAGES.MATCH]:     "Match found",
-  [STAGES.HANDOVER]:  "Handover",
-  [STAGES.DEPARTED]:  "En route",
-  [STAGES.ARRIVAL]:   "Arrival",
-  [STAGES.COMPLETED]: "Completed",
+  [STAGES.HANDOVER]:      "Handover",
+  [STAGES.DEPARTED]:      "En route",
+  [STAGES.ARRIVAL]:       "Arrival",
+  [STAGES.COMPLETED]:     "Completed",
+  [STAGES.NO_VOLUNTEER]:  "No Availability",
 };
 
 export default function MyTrip() {
@@ -611,6 +666,9 @@ export default function MyTrip() {
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
         {displayRegister && (
           <RegisterView onSubmit={form => { addTrip(form); setShowRegister(false); }} />
+        )}
+        {!displayRegister && stage === STAGES.NO_VOLUNTEER && (
+          <NoVolunteerView onReset={handleReset} />
         )}
         {!displayRegister && stage === STAGES.AWAITING && (
           <AwaitingView trip={tripData} onMatchFound={() => setStage(STAGES.MATCH)} />
