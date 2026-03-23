@@ -20,6 +20,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  const [role, setRole]         = useState("traveller");
   const [method, setMethod]     = useState("email");
   const [email, setEmail]       = useState("");
   const [phone, setPhone]       = useState("");
@@ -41,8 +42,8 @@ export default function Login() {
     }
     if (password.length < 6) { setError("Incorrect credentials."); return; }
     setError("");
-    login(method === "email" ? email : phone, method);
-    navigate("/dashboard");
+    login(method === "email" ? email : phone, method, role);
+    navigate(role === "requester" ? "/requester" : "/dashboard");
   }
 
   return (
@@ -80,11 +81,61 @@ export default function Login() {
       }}>
         <div style={{ marginBottom: "24px" }}>
           <div style={{ fontSize: "20px", fontWeight: "600", letterSpacing: "-0.5px", marginBottom: "4px" }}>
-            Traveller login
+            Portal login
           </div>
           <div style={{ fontSize: "13px", color: theme.textSecondary }}>
-            Sign in to manage your trips and matched items
+            Choose your role, then sign in to the right workspace
           </div>
+        </div>
+
+        <div style={{
+          display: "flex",
+          background: theme.surfaceHover,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "10px",
+          padding: "3px",
+          marginBottom: "16px",
+        }}>
+          {[
+            { key: "traveller", label: "Traveller" },
+            { key: "requester", label: "Requester" },
+          ].map(option => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setRole(option.key)}
+              style={{
+                flex: 1,
+                padding: "8px",
+                borderRadius: "7px",
+                border: "none",
+                fontSize: "13px",
+                fontWeight: "500",
+                fontFamily: "inherit",
+                cursor: "pointer",
+                background: role === option.key ? theme.bg : "transparent",
+                color: role === option.key ? theme.textPrimary : theme.textTertiary,
+                boxShadow: role === option.key ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{
+          fontSize: "12px",
+          color: theme.textSecondary,
+          background: theme.bg,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "10px",
+          padding: "10px 12px",
+          marginBottom: "20px",
+          lineHeight: "1.5",
+        }}>
+          {role === "requester"
+            ? "Requester sign-in opens the request tracking portal with the embedded request form."
+            : "Traveller sign-in opens the existing trip dashboard and match flow."}
         </div>
 
         {/* Method toggle */}
@@ -178,8 +229,7 @@ export default function Login() {
       </div>
 
       <div style={{ marginTop: "20px", fontSize: "12px", color: theme.textTertiary }}>
-        Not a traveller?{" "}
-        <span style={{ color: theme.accent, cursor: "pointer" }}>Request access</span>
+        Role selection controls where you land after sign-in.
       </div>
     </div>
   );

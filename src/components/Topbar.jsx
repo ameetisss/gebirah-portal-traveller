@@ -11,13 +11,21 @@ function getInitials(name) {
     .join("");
 }
 
-const NAV_ITEMS = [
+const DEFAULT_NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard" },
   { path: "/trip",      label: "My trip" },
   { path: "/history",   label: "History" },
 ];
 
-export default function Topbar() {
+export default function Topbar({
+  navItems = DEFAULT_NAV_ITEMS,
+  homePath = "/dashboard",
+  brandLabel = "Gebirah",
+  logoBg = theme.accent,
+  logoColor = "#fff",
+  avatarBg = theme.accent,
+  avatarColor = "#fff",
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName } = useAuth();
@@ -39,24 +47,26 @@ export default function Topbar() {
       {/* Logo */}
       <div
         style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}
-        onClick={() => navigate("/dashboard")}
+        onClick={() => navigate(homePath)}
       >
         <div style={{
           width: "28px", height: "28px", borderRadius: "8px",
-          background: theme.accent,
+          background: logoBg,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "12px", fontWeight: "700", color: "#fff", letterSpacing: "-0.5px",
+          fontSize: "12px", fontWeight: "700", color: logoColor, letterSpacing: "-0.5px",
         }}>G</div>
-        <span style={{ fontSize: "14px", fontWeight: "600", letterSpacing: "-0.3px" }}>Gebirah</span>
+        <span style={{ fontSize: "14px", fontWeight: "600", letterSpacing: "-0.3px" }}>{brandLabel}</span>
       </div>
 
       {/* Nav */}
-      <nav style={{ display: "flex", gap: "4px" }}>
-        {NAV_ITEMS.map(n => {
-          const isActive = location.pathname === n.path;
+      <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
+        {navItems.map(n => {
+          const isActive = n.match
+            ? n.match(location)
+            : location.pathname === n.path && (n.hash ? location.hash === n.hash : true);
           return (
             <button
-              key={n.path}
+              key={`${n.path}${n.hash ?? ""}`}
               style={{
                 padding: "5px 14px",
                 borderRadius: "20px",
@@ -68,7 +78,7 @@ export default function Topbar() {
                 fontFamily: "inherit",
                 fontWeight: isActive ? "500" : "400",
               }}
-              onClick={() => navigate(n.path)}
+              onClick={() => navigate(`${n.path}${n.hash ?? ""}`)}
             >{n.label}</button>
           );
         })}
@@ -84,9 +94,9 @@ export default function Topbar() {
       }}>
         <div style={{
           width: "26px", height: "26px", borderRadius: "50%",
-          background: theme.accent,
+          background: avatarBg,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "10px", fontWeight: "700", color: "#fff",
+          fontSize: "10px", fontWeight: "700", color: avatarColor,
         }}>{initials}</div>
         <span style={{ fontSize: "12px", color: theme.textSecondary }}>{userName}</span>
       </div>
