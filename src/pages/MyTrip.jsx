@@ -11,9 +11,48 @@ const STAGE_ORDER = [STAGES.AWAITING, STAGES.MATCH, STAGES.HANDOVER, STAGES.DEPA
 // ── Stage 1: Register ──────────────────────────────────────────
 
 function RegisterView({ onSubmit }) {
-  const [form, setForm] = useState({ destination: "", flight: "", date: "", weight: "" });
+  const [form, setForm] = useState({ destination: "", flight: "", date: "", weight: "", departure_time: "" });
+  const [isSearching, setIsSearching] = useState(false);
+  const [flightOptions, setFlightOptions] = useState([]);
+  
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const valid = form.destination && form.flight && form.date && form.weight;
+
+  useEffect(() => {
+    if (form.flight.length > 2 && form.date) {
+      setIsSearching(true);
+      const timer = setTimeout(() => {
+        fetch("http://localhost:8000/api/flight-departure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flight_number: form.flight.replace(/\s+/g, "").toUpperCase(), date: form.date })
+        })
+        .then(res => res.json())
+        .then(data => {
+          setIsSearching(false);
+          if (data.status === "success" && data.flights && data.flights.length > 0) {
+            setFlightOptions(data.flights);
+            const bestFlight = data.flights[0];
+            setForm(prev => ({
+              ...prev,
+              destination: `${bestFlight.destination_country} (${bestFlight.arrival_airport})`,
+              departure_time: bestFlight.departure_time
+            }));
+          } else {
+            setFlightOptions([]);
+          }
+        })
+        .catch(err => {
+          console.error("Flight lookup error:", err);
+          setIsSearching(false);
+        });
+      }, 500); // Small debounce
+      return () => clearTimeout(timer);
+    } else {
+      setFlightOptions([]);
+      setIsSearching(false);
+    }
+  }, [form.flight, form.date]);
 
   return (
     <div style={{ maxWidth: "480px", margin: "0 auto" }}>
@@ -23,22 +62,66 @@ function RegisterView({ onSubmit }) {
       </div>
       <Card>
         <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          {[
-            { label: "Destination",   key: "destination", placeholder: "e.g. Amman, Jordan" },
-            { label: "Flight number", key: "flight",      placeholder: "e.g. SQ 417" },
-            { label: "Departure date",key: "date",        placeholder: "DD / MM / YYYY", type: "date" },
-          ].map(f => (
-            <div key={f.key}>
-              <FieldLabel>{f.label}</FieldLabel>
-              <input type={f.type || "text"} placeholder={f.placeholder}
-                value={form[f.key]} onChange={e => set(f.key, e.target.value)} style={inputStyle} />
+          
+          <div>
+            <FieldLabel>Flight number</FieldLabel>
+            <input type="text" placeholder="e.g. SQ 417"
+              value={form.flight} onChange={e => set("flight", e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <FieldLabel>Departure date</FieldLabel>
+            <input type="date" placeholder="DD / MM / YYYY"
+              value={form.date} onChange={e => set("date", e.target.value)} style={inputStyle} />
+          </div>
+          
+          {isSearching && (
+            <div style={{ fontSize: "12px", color: theme.textSecondary, fontStyle: "italic" }}>
+              Searching for flight details...
             </div>
-          ))}
+          )}
+
+          {flightOptions.length > 1 && (
+            <div style={{ background: theme.accentDim, padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}` }}>
+              <FieldLabel>Select Departure Time</FieldLabel>
+              <select 
+                style={{ ...inputStyle, marginBottom: "0", marginTop: "8px" }}
+                value={form.departure_time || ""}
+                onChange={e => {
+                  const selected = flightOptions.find(f => f.departure_time === e.target.value);
+                  if (selected) {
+                    setForm(prev => ({
+                      ...prev,
+                      departure_time: selected.departure_time,
+                      destination: `${selected.destination_country} (${selected.arrival_airport})`
+                    }));
+                  }
+                }}
+              >
+                {flightOptions.map((f, i) => (
+                  <option key={i} value={f.departure_time}>{f.departure_time} - Arriving in {f.arrival_airport}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          {flightOptions.length === 1 && !isSearching && (
+            <div style={{ fontSize: "12px", color: theme.green, background: theme.greenDim, padding: "8px", borderRadius: "4px", border: `1px solid ${theme.green}40` }}>
+              ✓ Flight found: Departs at {flightOptions[0].departure_time}
+            </div>
+          )}
+
+          <div>
+            <FieldLabel>Destination</FieldLabel>
+            <input type="text" placeholder="e.g. Amman, Jordan"
+              value={form.destination} onChange={e => set("destination", e.target.value)} style={inputStyle} />
+          </div>
+
           <div>
             <FieldLabel>Spare baggage (kg)</FieldLabel>
             <input type="number" placeholder="0.0" min="0" step="0.5"
               value={form.weight} onChange={e => set("weight", e.target.value)} style={inputStyle} />
           </div>
+
           <button style={{ ...btn("primary"), marginTop: "4px", opacity: valid ? 1 : 0.4 }}
             disabled={!valid} onClick={() => valid && onSubmit(form)}>
             Submit trip

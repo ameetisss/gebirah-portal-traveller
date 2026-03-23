@@ -5,7 +5,7 @@ import os
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from flights import fetch_regional_flights
-from csv_service import get_departure_time, get_csv_head
+from csv_service import get_flight_details, get_csv_head
 
 # Load environment variables from .env file
 load_dotenv()
@@ -42,11 +42,14 @@ def health_check():
 @app.post("/api/flight-departure")
 async def get_flight_departure(request: FlightDepartureRequest):
     try:
-        departure_time = get_departure_time(request.flight_number, request.date)
-        if departure_time:
-            return {"status": "success", "departure_time": departure_time}
+        details_list = get_flight_details(request.flight_number, request.date)
+        if details_list:
+            return {
+                "status": "success", 
+                "flights": details_list
+            }
         else:
-            return {"status": "not_found", "message": "Flight departure time not found for the given parameters."}
+            return {"status": "not_found", "message": "Flight details not found for the given parameters."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

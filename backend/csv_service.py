@@ -1,17 +1,18 @@
 import os
 import csv
-from typing import Optional
+from typing import Optional, Dict, List
 
-def get_departure_time(flight_number: str, search_date: str) -> Optional[str]:
+def get_flight_details(flight_number: str, search_date: str) -> List[Dict[str, str]]:
     """
-    Scans the 'data' directory for CSV files and looks for a matching 
-    flight number and search date. Returns the departure time if found.
+    Scans the 'data' directory for CSV files and looks for matching 
+    flight numbers and search dates. Returns a list of flight details.
     """
     data_dir = "data"
+    results = []
     
     # If the directory doesn't exist, we obviously have no data
     if not os.path.exists(data_dir):
-        return None
+        return results
 
     # Iterate through all CSV files in the data directory
     for filename in os.listdir(data_dir):
@@ -28,20 +29,23 @@ def get_departure_time(flight_number: str, search_date: str) -> Optional[str]:
                 for row in reader:
                     # Depending on how it's saved, flight_number might have extra spaces.
                     # We strip to be safe and do a case-insensitive check if needed.
-                    csv_flight = row.get("Flight Number", "").strip().upper()
-                    target_flight = flight_number.strip().upper()
+                    csv_flight = "".join(row.get("Flight Number", "").split()).upper()
+                    target_flight = "".join(flight_number.split()).upper()
                     
                     csv_date = row.get("Search Date", "").strip()
                     target_date = search_date.strip()
                     
                     if csv_flight == target_flight and csv_date == target_date:
-                        return row.get("Departure Time", "").strip()
+                        results.append({
+                            "departure_time": row.get("Departure Time", "").strip(),
+                            "arrival_airport": row.get("Arrival Airport", "").strip(),
+                            "destination_country": row.get("Destination Country", "").strip()
+                        })
                         
         except Exception as e:
             print(f"Error reading {filepath}: {e}")
             
-    # If no match is found across all files
-    return None
+    return results
 
 def get_csv_head(n: int = 5) -> Optional[list]:
     """
