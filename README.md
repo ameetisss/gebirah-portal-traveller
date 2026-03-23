@@ -1,16 +1,18 @@
-# React + Vite
+## Getting Started
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+To get the project up and running on your local machine, follow these steps:
 
-Currently, two official plugins are available:
+1. Install the dependencies:
+```bash
+npm install
+npm run dev
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## React Compiler
+And you can add this section to explain the login requirements for the dashboard:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```markdown
+## Accessing the Dashboard
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+To log in and access the dashboard, you can use the following criteria:
+- **Username:** Enter your email address.
+- **Password:** Enter any word that is **more than 6 letters** long.
