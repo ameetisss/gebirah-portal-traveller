@@ -3,11 +3,29 @@
 ## Getting Started
 
 ### Frontend Setup
-1. Install the dependencies:
+1. Use a supported Node.js version.
+```bash
+nvm use
+```
+If `nvm` says the version is missing, install it first:
+```bash
+nvm install 20.19.0
+nvm use 20.19.0
+```
+`vite@8` in this project requires Node.js `20.19+` or `22.12+`.
+
+2. Install the dependencies:
 ```bash
 npm install
 ```
-2. Run the website
+
+If you installed dependencies with an older Node version and see a Rolldown native binding error, reinstall cleanly:
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+3. Run the website
 ```bash
 npm run dev
 ```

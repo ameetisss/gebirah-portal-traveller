@@ -5,10 +5,16 @@ import Login     from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MyTrip    from "./pages/MyTrip";
 import History   from "./pages/History";
+import RequesterPortal from "./pages/RequesterPortal";
+import RequesterHistory from "./pages/RequesterHistory";
 
-function ProtectedRoute({ children }) {
-  const { isLoggedIn } = useAuth();
-  return isLoggedIn ? children : <Navigate to="/login" replace />;
+function ProtectedRoute({ children, allowRoles }) {
+  const { isLoggedIn, userRole } = useAuth();
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (allowRoles && !allowRoles.includes(userRole)) {
+    return <Navigate to={userRole === "requester" ? "/requester" : "/dashboard"} replace />;
+  }
+  return children;
 }
 
 function AppRoutes() {
@@ -16,9 +22,11 @@ function AppRoutes() {
     <Routes>
       <Route path="/"         element={<Navigate to="/login" replace />} />
       <Route path="/login"    element={<Login />} />
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/trip"     element={<ProtectedRoute><MyTrip /></ProtectedRoute>} />
-      <Route path="/history"  element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute allowRoles={["traveller"]}><Dashboard /></ProtectedRoute>} />
+      <Route path="/trip"     element={<ProtectedRoute allowRoles={["traveller"]}><MyTrip /></ProtectedRoute>} />
+      <Route path="/history"  element={<ProtectedRoute allowRoles={["traveller"]}><History /></ProtectedRoute>} />
+      <Route path="/requester" element={<ProtectedRoute allowRoles={["requester"]}><RequesterPortal /></ProtectedRoute>} />
+      <Route path="/request-history" element={<ProtectedRoute allowRoles={["requester"]}><RequesterHistory /></ProtectedRoute>} />
       <Route path="*"         element={<Navigate to="/login" replace />} />
     </Routes>
   );
