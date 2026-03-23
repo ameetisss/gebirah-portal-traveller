@@ -5,6 +5,7 @@ import os
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from flights import fetch_regional_flights
+from csv_service import get_departure_time, get_csv_head
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +27,10 @@ class FlightSearchRequest(BaseModel):
     start_date: str
     end_date: str
 
+class FlightDepartureRequest(BaseModel):
+    flight_number: str
+    date: str
+
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI!", "environment": os.getenv("ENVIRONMENT", "development")}
@@ -33,6 +38,28 @@ def read_root():
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
+
+@app.post("/api/flight-departure")
+async def get_flight_departure(request: FlightDepartureRequest):
+    try:
+        departure_time = get_departure_time(request.flight_number, request.date)
+        if departure_time:
+            return {"status": "success", "departure_time": departure_time}
+        else:
+            return {"status": "not_found", "message": "Flight departure time not found for the given parameters."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/csv-head")
+async def get_head(n: int = 5):
+    try:
+        rows = get_csv_head(n)
+        if rows is not None:
+            return {"status": "success", "data": rows}
+        else:
+            return {"status": "not_found", "message": "No CSV files found in the data directory."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/fetch-flights")
 async def trigger_flight_fetch(request: FlightSearchRequest):

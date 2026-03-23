@@ -44,7 +44,9 @@ uvicorn main:app --reload
 ### Available Endpoints
 - `GET /`: Root check.
 - `GET /api/health`: Health check.
+- `GET /api/csv-head`: Retrieve the first few rows of a CSV file (default 5).
 - `POST /api/fetch-flights`: Trigger flight fetching (requires valid SerpApi key).
+- `POST /api/flight-departure`: Retrieve a flight's departure time from local CSV data.
 
 ## Accessing the Dashboard
 
