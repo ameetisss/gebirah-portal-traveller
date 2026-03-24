@@ -14,13 +14,28 @@ function RegisterView({ onSubmit }) {
   const [form, setForm] = useState({ destination: "", flight: "", date: "", weight: "", departure_time: "" });
   const [isSearching, setIsSearching] = useState(false);
   const [flightOptions, setFlightOptions] = useState([]);
-  
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const valid = form.destination && form.flight && form.date && form.weight;
+  const [flightNotFound, setFlightNotFound] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // A valid flight has been confirmed by the API
+  const flightConfirmed = flightOptions.length > 0;
+
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    // Reset flight status when the user edits flight number or date
+    if (k === "flight" || k === "date") {
+      setFlightOptions([]);
+      setFlightNotFound(false);
+    }
+  };
+
+  // All fields filled AND a flight was confirmed via API
+  const valid = flightConfirmed && form.destination && form.flight && form.date && form.weight;
 
   useEffect(() => {
     if (form.flight.length > 2 && form.date) {
       setIsSearching(true);
+      setFlightNotFound(false);
       const timer = setTimeout(() => {
         fetch("http://localhost:8000/api/flight-departure", {
           method: "POST",
@@ -32,6 +47,7 @@ function RegisterView({ onSubmit }) {
           setIsSearching(false);
           if (data.status === "success" && data.flights && data.flights.length > 0) {
             setFlightOptions(data.flights);
+            setFlightNotFound(false);
             const bestFlight = data.flights[0];
             setForm(prev => ({
               ...prev,
@@ -40,19 +56,34 @@ function RegisterView({ onSubmit }) {
             }));
           } else {
             setFlightOptions([]);
+            setFlightNotFound(true);
+            // Clear any previously auto-filled destination
+            setForm(prev => ({ ...prev, destination: "", departure_time: "" }));
           }
         })
         .catch(err => {
           console.error("Flight lookup error:", err);
           setIsSearching(false);
+          setFlightNotFound(true);
         });
-      }, 500); // Small debounce
+      }, 600);
       return () => clearTimeout(timer);
     } else {
       setFlightOptions([]);
+      setFlightNotFound(false);
       setIsSearching(false);
     }
   }, [form.flight, form.date]);
+
+  async function handleSubmit() {
+    if (!valid || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div style={{ maxWidth: "480px", margin: "0 auto" }}>
@@ -62,28 +93,61 @@ function RegisterView({ onSubmit }) {
       </div>
       <Card>
         <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          
+
           <div>
             <FieldLabel>Flight number</FieldLabel>
-            <input type="text" placeholder="e.g. SQ 417"
-              value={form.flight} onChange={e => set("flight", e.target.value)} style={inputStyle} />
+            <input
+              type="text"
+              placeholder="e.g. SQ 417"
+              value={form.flight}
+              onChange={e => set("flight", e.target.value)}
+              style={{
+                ...inputStyle,
+                borderColor: flightNotFound ? "#ef4444" : undefined,
+                outline: flightNotFound ? "none" : undefined,
+              }}
+            />
           </div>
+
           <div>
             <FieldLabel>Departure date</FieldLabel>
-            <input type="date" placeholder="DD / MM / YYYY"
-              value={form.date} onChange={e => set("date", e.target.value)} style={inputStyle} />
+            <input
+              type="date"
+              value={form.date}
+              onChange={e => set("date", e.target.value)}
+              style={{
+                ...inputStyle,
+                borderColor: flightNotFound ? "#ef4444" : undefined,
+              }}
+            />
           </div>
-          
+
+          {/* Flight status feedback */}
           {isSearching && (
             <div style={{ fontSize: "12px", color: theme.textSecondary, fontStyle: "italic" }}>
-              Searching for flight details...
+              🔍 Searching for flight details...
             </div>
           )}
 
-          {flightOptions.length > 1 && (
+          {flightNotFound && !isSearching && (
+            <div style={{
+              fontSize: "12px", color: "#ef4444",
+              background: "#fef2f2", border: "1px solid #fca5a5",
+              borderRadius: "6px", padding: "10px 12px",
+              display: "flex", alignItems: "flex-start", gap: "8px",
+            }}>
+              <span style={{ fontSize: "14px", flexShrink: 0 }}>✗</span>
+              <span>
+                Flight <strong>{form.flight.toUpperCase()}</strong> on <strong>{form.date}</strong> could not be found.
+                Please double-check the flight number and departure date.
+              </span>
+            </div>
+          )}
+
+          {flightOptions.length > 1 && !isSearching && (
             <div style={{ background: theme.accentDim, padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}` }}>
               <FieldLabel>Select Departure Time</FieldLabel>
-              <select 
+              <select
                 style={{ ...inputStyle, marginBottom: "0", marginTop: "8px" }}
                 value={form.departure_time || ""}
                 onChange={e => {
@@ -98,15 +162,15 @@ function RegisterView({ onSubmit }) {
                 }}
               >
                 {flightOptions.map((f, i) => (
-                  <option key={i} value={f.departure_time}>{f.departure_time} - Arriving in {f.arrival_airport}</option>
+                  <option key={i} value={f.departure_time}>{f.departure_time} – Arriving in {f.arrival_airport}</option>
                 ))}
               </select>
             </div>
           )}
-          
+
           {flightOptions.length === 1 && !isSearching && (
-            <div style={{ fontSize: "12px", color: theme.green, background: theme.greenDim, padding: "8px", borderRadius: "4px", border: `1px solid ${theme.green}40` }}>
-              ✓ Flight found: Departs at {flightOptions[0].departure_time}
+            <div style={{ fontSize: "12px", color: theme.green, background: theme.greenDim, padding: "8px 12px", borderRadius: "6px", border: `1px solid ${theme.green}40` }}>
+              ✓ Flight found · Departs at {flightOptions[0].departure_time}
             </div>
           )}
 
@@ -122,9 +186,19 @@ function RegisterView({ onSubmit }) {
               value={form.weight} onChange={e => set("weight", e.target.value)} style={inputStyle} />
           </div>
 
-          <button style={{ ...btn("primary"), marginTop: "4px", opacity: valid ? 1 : 0.4 }}
-            disabled={!valid} onClick={() => valid && onSubmit(form)}>
-            Submit trip
+          {/* Helper hint when flight not yet confirmed */}
+          {!flightConfirmed && !isSearching && !flightNotFound && form.flight && form.date && (
+            <div style={{ fontSize: "11px", color: theme.textTertiary, fontStyle: "italic" }}>
+              Enter a valid flight number and date to verify before submitting.
+            </div>
+          )}
+
+          <button
+            style={{ ...btn("primary"), marginTop: "4px", opacity: (valid && !isSubmitting) ? 1 : 0.4 }}
+            disabled={!valid || isSubmitting}
+            onClick={handleSubmit}
+          >
+            {isSubmitting ? "Checking availability…" : "Submit trip"}
           </button>
         </div>
       </Card>
@@ -317,10 +391,8 @@ function HandoverView({ trip, handover, onConfirm, onViewTrips }) {
       {/* Volunteer */}
       <Card style={{ marginBottom: "14px" }}>
         <CardHeader title="Volunteer contact" />
-        <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: theme.tealDim, border: `2px solid ${theme.teal}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: theme.teal, flexShrink: 0 }}>
-            {handover.volunteerInitials}
-          </div>
+        <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ fontSize: "20px" }}>👤</div>
           <div>
             <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "3px" }}>{handover.volunteer}</div>
             <div style={{ fontSize: "13px", color: theme.textSecondary }}>{handover.volunteerPhone}</div>
@@ -404,10 +476,8 @@ function DepartedView({ trip, handover, arrival, onLanded }) {
           <div style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: "1.7", marginBottom: "16px" }}>
             When you land in {trip.destination}, a local volunteer will meet you at the arrivals hall to collect the items.
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px", background: theme.surface, borderRadius: "10px", border: `1px solid ${theme.border}` }}>
-            <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: theme.tealDim, border: `2px solid ${theme.teal}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", color: theme.teal, flexShrink: 0 }}>
-              {arrival.volunteerInitials}
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", background: theme.surface, borderRadius: "10px", border: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: "18px" }}>👤</div>
             <div>
               <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, marginBottom: "2px" }}>{arrival.volunteer}</div>
               <div style={{ fontSize: "12px", color: theme.textSecondary }}>{arrival.volunteerPhone}</div>
@@ -440,10 +510,8 @@ function ArrivalView({ trip, arrival, onConfirm }) {
       {/* Local volunteer */}
       <Card style={{ marginBottom: "14px" }}>
         <CardHeader title="Local volunteer" />
-        <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: theme.tealDim, border: `2px solid ${theme.teal}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: theme.teal, flexShrink: 0 }}>
-            {arrival.volunteerInitials}
-          </div>
+        <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ fontSize: "20px" }}>👤</div>
           <div>
             <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "3px" }}>{arrival.volunteer}</div>
             <div style={{ fontSize: "13px", color: theme.textSecondary }}>{arrival.volunteerPhone}</div>
@@ -665,7 +733,7 @@ export default function MyTrip() {
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
         {displayRegister && (
-          <RegisterView onSubmit={form => { addTrip(form); setShowRegister(false); }} />
+          <RegisterView onSubmit={async form => { await addTrip(form); setShowRegister(false); }} />
         )}
         {!displayRegister && stage === STAGES.NO_VOLUNTEER && (
           <NoVolunteerView onReset={handleReset} />

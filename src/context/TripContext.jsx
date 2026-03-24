@@ -64,18 +64,50 @@ export function TripProvider({ children }) {
     ? [STAGES.HANDOVER, STAGES.DEPARTED, STAGES.ARRIVAL, STAGES.COMPLETED].includes(activeTrip.stage)
     : false;
   const activeHandover = activeTrip
-    ? { ...DEMO_HANDOVER, date: activeTrip.date }
+    ? { 
+        ...DEMO_HANDOVER, 
+        volunteer: activeTrip.volunteer_name || DEMO_HANDOVER.volunteer,
+        date: activeTrip.date 
+      }
     : DEMO_HANDOVER;
 
-  // Add a new trip (replaces setTripData + setStage(AWAITING))
-  function addTrip(formData) {
+  // Add a new trip — calls the backend to check volunteer availability at departure datetime.
+  // Returns a promise that resolves when the trip has been added and the stage is set.
+  async function addTrip(formData) {
     const id = Date.now();
-    // Check day of week from the departure date (0=Sun, 1=Mon, ..., 6=Sat)
-    const dayOfWeek = formData.date ? new Date(formData.date).getDay() : new Date().getDay();
-    // Mon(1) to Thu(4) = volunteers available; Fri(5), Sat(6), Sun(0) = no volunteers
-    const volunteersAvailable = dayOfWeek >= 1 && dayOfWeek <= 4;
-    const initialStage = volunteersAvailable ? STAGES.AWAITING : STAGES.NO_VOLUNTEER;
-    setTrips(prev => [...prev, { id, ...formData, stage: initialStage }]);
+    // Build an ISO datetime from the form's departure date + time
+    let timeStr = formData.departure_time || "00:00";
+    let isoDatetime;
+
+    if (timeStr.includes("-") && (timeStr.includes(" ") || timeStr.includes("T"))) {
+      // If timeStr already contains a date, just make sure it uses 'T'
+      isoDatetime = timeStr.replace(" ", "T");
+    } else {
+      // Otherwise, combine it with the selected date
+      isoDatetime = formData.date ? `${formData.date}T${timeStr}` : new Date().toISOString();
+    }
+
+    // Ensure we have seconds at the end if missing (for backend robustness)
+    if (isoDatetime.split("T")[1].split(":").length === 2) {
+      isoDatetime += ":00";
+    }
+
+    let initialStage = STAGES.AWAITING; // safe default
+    let volunteerName = null;
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/volunteers/lookup?datetime=${encodeURIComponent(isoDatetime)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        initialStage = data.status === "available" ? STAGES.AWAITING : STAGES.NO_VOLUNTEER;
+        volunteerName = data.volunteer_name;
+      }
+    } catch (err) {
+      console.warn("Volunteer lookup failed, defaulting to AWAITING:", err);
+    }
+
+    setTrips(prev => [...prev, { id, ...formData, stage: initialStage, volunteer_name: volunteerName }]);
     setActiveTripId(id);
   }
 
@@ -102,7 +134,7 @@ export function TripProvider({ children }) {
       items: DEMO_HANDOVER.items.length,
       kg: DEMO_HANDOVER.totalWeight,
       itemsList: DEMO_HANDOVER.items,
-      departureVolunteer: DEMO_HANDOVER.volunteer,
+      departureVolunteer: activeTrip.volunteer_name || DEMO_HANDOVER.volunteer,
       arrivalVolunteer:   DEMO_ARRIVAL.volunteer,
     }, ...prev]);
   }
