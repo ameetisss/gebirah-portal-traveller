@@ -281,12 +281,11 @@ function NoVolunteerView({ onReset }) {
       </div>
 
       <div style={{ fontSize: "22px", fontWeight: "700", letterSpacing: "-0.5px", marginBottom: "12px" }}>
-        Thank You for Volunteering!
+        Thank You for Your Heart!
       </div>
       <div style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: "1.8", marginBottom: "28px" }}>
-        Unfortunately, we do not have any free volunteers during this timing.
-        Thank you so much for your interest — we truly appreciate it!<br /><br />
-        It would mean a lot if you followed us to stay in the loop about future opportunities. 🌟
+        Thank you so much for your interest and willingness to help. Whether we couldn't find a perfect timing match or you've decided to decline the current options, we truly appreciate your heart for this cause.<br /><br />
+        It would mean a lot if you followed us to stay in the loop about future opportunities to serve. 🌟
       </div>
 
       <a
@@ -879,7 +878,7 @@ export default function MyTrip() {
             trip={tripData}
             candidateMatches={tripData.candidateMatches || []}
             onAccept={(indices) => confirmMatches(indices)}
-            onDecline={() => setStage(STAGES.AWAITING)}
+            onDecline={() => setStage(STAGES.NO_VOLUNTEER)}
           />
         )}
         {!displayRegister && stage === STAGES.HANDOVER && (
