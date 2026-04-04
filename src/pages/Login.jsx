@@ -230,6 +230,10 @@ export default function Login() {
       <div style={{ marginTop: "20px", fontSize: "12px", color: theme.textTertiary }}>
         Role selection controls where you land after sign-in.
       </div>
+      <div style={{ marginTop: "10px", fontSize: "12px", color: theme.textTertiary }}>
+        Are you a volunteer?{" "}
+        <span style={{ color: theme.teal, cursor: "pointer" }} onClick={() => navigate("/volunteer/login")}>Sign in here</span>
+      </div>
     </div>
   );
 }
