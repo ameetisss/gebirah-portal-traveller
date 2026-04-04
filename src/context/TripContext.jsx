@@ -7,9 +7,11 @@ export const STAGES = {
   MATCH:        "match",
   HANDOVER:     "handover",
   DEPARTED:     "departed",
-  ARRIVAL:      "arrival",
-  COMPLETED:    "completed",
-  NO_VOLUNTEER: "no_volunteer",
+  ARRIVAL:       "arrival",
+  COMPLETED:     "completed",
+  NO_VOLUNTEER:  "no_volunteer",
+  DECLINED:      "declined",
+  UNAVAILABLE:   "unavailable",
 };
 
 const TripContext = createContext();
@@ -19,12 +21,12 @@ export function TripProvider({ children }) {
   const [activeTripId, setActiveTripId] = useState(null);
   const [completedTrips, setCompletedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { travellerId } = useAuth();
+  const { userId } = useAuth();
 
-  // Fetch initial data from backend when the component mounts or travellerId changes
+  // Fetch initial data from backend when the component mounts or userId changes
   useEffect(() => {
     async function fetchData() {
-      if (!travellerId) {
+      if (!userId) {
         setTrips([]);
         setCompletedTrips([]);
         setLoading(false);
@@ -33,7 +35,7 @@ export function TripProvider({ children }) {
       
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/api/trips/history?traveller_id=${travellerId}`);
+        const res = await fetch(`http://localhost:8000/api/trips/history?traveller_id=${userId}`);
         if (res.ok) {
           const result = await res.json();
           // Map database fields to frontend expectations
@@ -51,8 +53,9 @@ export function TripProvider({ children }) {
             ...t
           }));
           
-          setTrips(allTrips.filter(t => t.status !== "completed"));
-          setCompletedTrips(allTrips.filter(t => t.status === "completed").map(t => ({
+          const historyStatuses = ["completed", "declined", "unavailable", "no_volunteer"];
+          setTrips(allTrips.filter(t => !historyStatuses.includes(t.status)));
+          setCompletedTrips(allTrips.filter(t => historyStatuses.includes(t.status)).map(t => ({
              ...t,
              itemsList: t.match_data || [],
              kg: t.allocated_capacity_kg || (t.match_data ? t.match_data.reduce((s, i) => s + i.weight, 0) : 0),
@@ -69,7 +72,7 @@ export function TripProvider({ children }) {
       }
     }
     fetchData();
-  }, [travellerId]);
+  }, [userId]);
 
   // Active trip: prefer activeTripId, fall back to first trip
   const activeTrip = trips.find(t => t.id === activeTripId) ?? trips[0] ?? null;
@@ -106,8 +109,8 @@ export function TripProvider({ children }) {
         }
       }
 
-      // 2. Fetch match from catalogue 
-      const mRes = await fetch(`http://localhost:8000/api/matches/generate?weight=${formData.weight || 2.0}`);
+      // 2. Fetch match from item_requests (prioritized)
+      const mRes = await fetch(`http://localhost:8000/api/matches/generate?weight=${formData.weight || 2.0}&destination=${encodeURIComponent(formData.destination)}`);
       if (mRes.ok) {
         const mJson = await mRes.json();
         matchData = mJson.data;
@@ -149,7 +152,7 @@ export function TripProvider({ children }) {
             body: JSON.stringify({ 
                ...formData, 
                status: initialStage, 
-               traveller_id: travellerId,
+               traveller_id: userId,
                handover_data: handoverData,
                arrival_data: arrivalData,
                candidate_matches: matchData,
@@ -182,13 +185,13 @@ export function TripProvider({ children }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-           ...formData, 
-           status: initialStage, 
-           traveller_id: travellerId,
-           handover_data: handoverData,
-           arrival_data: arrivalData,
-           candidate_matches: matchData // Initial pool of up to 3
-        }),
+            ...formData, 
+            status: initialStage === STAGES.NO_VOLUNTEER ? "unavailable" : initialStage, 
+            traveller_id: userId,
+            handover_data: handoverData,
+            arrival_data: arrivalData,
+            candidate_matches: matchData // Initial pool of up to 3
+         }),
       });
 
       if (res.ok) {
@@ -197,6 +200,7 @@ export function TripProvider({ children }) {
           id: result.data.trips_id,
           ...formData,
           stage: initialStage,
+          status: result.data.status, // Ensure status from DB is preserved
           handoverData,
           candidateMatches: matchData, // Now an array of up to 3 candidates
           matchData: null,             // Selected items will go here
@@ -253,6 +257,21 @@ export function TripProvider({ children }) {
     }
   }
 
+  async function updateTripStatus(tripId, newStatus) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/trips/${tripId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: newStatus, stage: newStatus } : t));
+      }
+    } catch (err) {
+      console.error("Failed to update trip status:", err);
+    }
+  }
+
   function setStageForTrip(tripId, newStage) {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, stage: newStage } : t));
   }
@@ -286,6 +305,23 @@ export function TripProvider({ children }) {
 
   function resetTrip() {
     if (!activeTrip) return;
+    
+    // If it's a "no availability" or "declined" trip, move it to history locally
+    const historyStatuses = ["unavailable", "declined", "no_volunteer"];
+    if (historyStatuses.includes(activeTrip.status)) {
+      const historyItem = {
+        ...activeTrip,
+        id: activeTrip.id,
+        kg: activeTrip.allocated_capacity_kg || (activeTrip.matchData ? activeTrip.matchData.reduce((s, i) => s + i.weight, 0) : 0),
+        route: `Singapore \u2192 ${activeTrip.destination}`,
+        items: activeTrip.matchData ? activeTrip.matchData.length : 0,
+        itemsList: activeTrip.matchData || [],
+        departureVolunteer: activeTrip.handoverData?.volunteer || "Unknown",
+        arrivalVolunteer:   activeTrip.arrivalData?.volunteer || "Unknown",
+      };
+      setCompletedTrips(prev => [historyItem, ...prev]);
+    }
+    
     const remaining = trips.filter(t => t.id !== activeTrip.id);
     setTrips(remaining);
     setActiveTripId(remaining[0]?.id ?? null);
@@ -299,6 +335,7 @@ export function TripProvider({ children }) {
       confirmMatches,
       matchAccepted, activeHandover, activeMatch, activeArrival,
       completedTrips, completeTrip, resetTrip,
+      updateTripStatus,
       loading
     }}>
       {children}

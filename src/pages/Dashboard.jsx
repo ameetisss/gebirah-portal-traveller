@@ -361,7 +361,13 @@ export default function Dashboard() {
                       <div style={{ fontSize: "11px", color: theme.textSecondary }}>{trip.date} &middot; {trip.items} items &middot; {trip.kg} kg</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <Badge color={theme.green} bg={theme.greenDim}>Delivered</Badge>
+                      {trip.status === "declined" ? (
+                        <Badge color={theme.red} bg={theme.redDim}>Declined</Badge>
+                      ) : (trip.status === "unavailable" || trip.status === "no_volunteer") ? (
+                        <Badge color={theme.amber} bg={theme.amberDim}>No Volunteer</Badge>
+                      ) : (
+                        <Badge color={theme.green} bg={theme.greenDim}>Delivered</Badge>
+                      )}
                       <span style={{ fontSize: "14px", color: theme.textTertiary }}>&rsaquo;</span>
                     </div>
                   </div>

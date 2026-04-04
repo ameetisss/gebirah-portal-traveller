@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
@@ -152,9 +153,41 @@ function RequestCard({ request }) {
 
 export default function RequesterPortal() {
   const location = useLocation();
+  const { userId } = useAuth();
   const newRequestRef = useRef(null);
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  async function fetchRequests() {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`http://localhost:8000/api/item-requests?user_id=${userId || ""}`);
+      const result = await res.json();
+      if (result.status === "success") {
+        const mapped = result.data.map(req => ({
+          id: req.id,
+          title: req.description,
+          meta: `${req.weight_kg} kg · ${req.destination} · Submitted ${new Date(req.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+          status: req.status,
+          statusColor: req.status === "In transit" ? "#3C7F2E" : "#8A5A16",
+          statusBg: req.status === "In transit" ? "#E5F3D9" : "#F8EBD3",
+          steps: req.status === "In transit" ? REQUEST_STEPS.inTransit : REQUEST_STEPS.waiting,
+          arrival: req.arrival_info || (req.reason ? `Reason: ${req.reason}` : "Coordinator is sourcing a traveller match"),
+        }));
+        setRequests(mapped);
+      }
+    } catch (e) {
+      console.error("Fetch requests error:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (location.hash === "#new-request") {
@@ -166,26 +199,32 @@ export default function RequesterPortal() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     if (!form.description || !form.weight || !form.destination) return;
 
-    setRequests((current) => [
-      {
-        id: Date.now(),
-        title: form.description,
-        meta: `${form.weight} kg · ${form.destination} · Submitted today`,
-        status: "Waiting",
-        statusColor: "#8A5A16",
-        statusBg: "#F8EBD3",
-        steps: REQUEST_STEPS.waiting,
-        arrival: form.reason
-          ? `Reason noted: ${form.reason}`
-          : `Urgency marked ${form.urgency.toLowerCase()}. Coordinator is sourcing a traveller match`,
-      },
-      ...current,
-    ]);
-    setForm(EMPTY_FORM);
+    try {
+      setIsSubmitting(true);
+      const res = await fetch("http://localhost:8000/api/item-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          user_id: userId
+        })
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        setForm(EMPTY_FORM);
+        fetchRequests();
+        // Scroll to top to see the new request
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch (e) {
+      console.error("Submit request error:", e);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const isValid = form.description && form.weight && form.destination;
@@ -228,9 +267,19 @@ export default function RequesterPortal() {
               </a>
             </div>
 
-            {requests.map((request) => (
-              <RequestCard key={request.id} request={request} />
-            ))}
+            {isLoading ? (
+              <div style={{ padding: "40px", textAlign: "center", color: theme.textTertiary }}>Loading your requests...</div>
+            ) : requests.length === 0 ? (
+              <div style={{ padding: "60px 40px", textAlign: "center", background: "#F8F4ED", borderRadius: "20px", border: "1px dashed #D9CFBF" }}>
+                <div style={{ fontSize: "32px", marginBottom: "16px" }}>📦</div>
+                <div style={{ fontSize: "16px", fontWeight: "600", color: theme.textPrimary, marginBottom: "8px" }}>No active requests</div>
+                <div style={{ fontSize: "14px", color: theme.textSecondary }}>Your submitted requests will appear here once you add them.</div>
+              </div>
+            ) : (
+              requests.map((request) => (
+                <RequestCard key={request.id} request={request} />
+              ))
+            )}
           </section>
 
           <section id="new-request" ref={newRequestRef}>
@@ -304,7 +353,7 @@ export default function RequesterPortal() {
 
                 <button
                   type="submit"
-                  disabled={!isValid}
+                  disabled={!isValid || isSubmitting}
                   style={{
                     ...btn("ghost"),
                     marginTop: "8px",
@@ -314,10 +363,10 @@ export default function RequesterPortal() {
                     border: "1px solid #D9CFBF",
                     color: theme.textPrimary,
                     fontSize: "16px",
-                    opacity: isValid ? 1 : 0.45,
+                    opacity: (isValid && !isSubmitting) ? 1 : 0.45,
                   }}
                 >
-                  Submit request
+                  {isSubmitting ? "Submitting..." : "Submit request"}
                 </button>
               </form>
             </Card>

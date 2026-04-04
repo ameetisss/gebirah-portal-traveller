@@ -47,7 +47,7 @@ def get_volunteer_at_datetime(dt_str: str) -> Optional[str]:
     selected_user_id = random.choice(matches)
     
     # Lookup profile
-    v_profile = get_supabase().table("user_profiles").select("full_name, phone").eq("user_id", selected_user_id).execute()
+    v_profile = get_supabase().table("user_profiles").select("full_name, phone").eq("id", selected_user_id).execute()
     
     if v_profile.data:
         return {

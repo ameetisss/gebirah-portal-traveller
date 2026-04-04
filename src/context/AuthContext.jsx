@@ -3,14 +3,14 @@ import { createContext, useContext, useState } from "react";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("travellerId"));
-  const [userName, setUserName] = useState(localStorage.getItem("userName") || "Traveller");
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("userId"));
+  const [userName, setUserName] = useState(localStorage.getItem("userName") || "User");
   const [userRole, setUserRole] = useState(localStorage.getItem("userRole") || "traveller");
-  const [travellerId, setTravellerId] = useState(localStorage.getItem("travellerId"));
+  const [userId, setUserId] = useState(localStorage.getItem("userId"));
 
   async function login(identifier, method, role = "traveller") {
     try {
-      const payload = method === "email" ? { email: identifier } : { phone: identifier };
+      const payload = method === "email" ? { email: identifier, role } : { phone: identifier, role };
       const res = await fetch("http://localhost:8000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -21,14 +21,14 @@ export function AuthProvider({ children }) {
       if (result.status === "success") {
         const userData = result.data;
         const newId = userData.id;
-        const newName = userData.full_name || "Traveller";
+        const newName = userData.full_name || "User";
         
-        setTravellerId(newId);
+        setUserId(newId);
         setUserName(newName);
         setUserRole(role);
         setIsLoggedIn(true);
         
-        localStorage.setItem("travellerId", newId);
+        localStorage.setItem("userId", newId);
         localStorage.setItem("userName", newName);
         localStorage.setItem("userRole", role);
       } else {
@@ -42,9 +42,9 @@ export function AuthProvider({ children }) {
   function logout() {
     setIsLoggedIn(false);
     setUserRole("traveller");
-    setUserName("Traveller");
-    setTravellerId(null);
-    localStorage.removeItem("travellerId");
+    setUserName("User");
+    setUserId(null);
+    localStorage.removeItem("userId");
     localStorage.removeItem("userName");
     localStorage.removeItem("userRole");
   }
@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
       isLoggedIn,
       userName,
       userRole,
-      travellerId,
+      userId,
       login,
       logout,
     }}>

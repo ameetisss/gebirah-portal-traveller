@@ -750,12 +750,14 @@ const STAGE_LABEL = {
   [STAGES.ARRIVAL]:       "Arrival",
   [STAGES.COMPLETED]:     "Completed",
   [STAGES.NO_VOLUNTEER]:  "No Availability",
+  [STAGES.DECLINED]:      "Declined",
+  [STAGES.UNAVAILABLE]:   "Unavailable",
 };
 
 export default function MyTrip() {
   const navigate = useNavigate();
   const { trips, activeTripId, setActiveTripId, addTrip, confirmMatches,
-          stage, setStage, tripData, activeHandover, activeMatch, activeArrival, resetTrip, completeTrip } = useTrip();
+          stage, setStage, tripData, activeHandover, activeMatch, activeArrival, resetTrip, completeTrip, updateTripStatus } = useTrip();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
 
@@ -878,7 +880,7 @@ export default function MyTrip() {
             trip={tripData}
             candidateMatches={tripData.candidateMatches || []}
             onAccept={(indices) => confirmMatches(indices)}
-            onDecline={() => setStage(STAGES.NO_VOLUNTEER)}
+            onDecline={() => { updateTripStatus(tripData.id, "declined"); setStage(STAGES.NO_VOLUNTEER); }}
           />
         )}
         {!displayRegister && stage === STAGES.HANDOVER && (

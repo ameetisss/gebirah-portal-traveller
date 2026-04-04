@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { theme } from "../theme";
 import { useAuth } from "../context/AuthContext";
@@ -28,8 +29,27 @@ export default function Topbar({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userName } = useAuth();
+  const { userName, userRole, logout } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
   const initials = getInitials(userName);
+
+  // Close menu on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   return (
     <div style={{
@@ -85,20 +105,98 @@ export default function Topbar({
       </nav>
 
       {/* User chip */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: "8px",
-        padding: "5px 12px 5px 5px",
-        borderRadius: "20px",
-        background: theme.surface,
-        border: `1px solid ${theme.border}`,
-      }}>
-        <div style={{
-          width: "26px", height: "26px", borderRadius: "50%",
-          background: avatarBg,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "10px", fontWeight: "700", color: avatarColor,
-        }}>{initials}</div>
-        <span style={{ fontSize: "12px", color: theme.textSecondary }}>{userName}</span>
+      <div 
+        ref={menuRef}
+        style={{ position: "relative" }}
+      >
+        <div 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          style={{
+            display: "flex", alignItems: "center", gap: "8px",
+            padding: "5px 12px 5px 5px",
+            borderRadius: "20px",
+            background: isMenuOpen ? theme.surfaceHover : theme.surface,
+            border: `1px solid ${isMenuOpen ? theme.accent : theme.border}`,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <div style={{
+            width: "26px", height: "26px", borderRadius: "50%",
+            background: avatarBg,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "10px", fontWeight: "700", color: avatarColor,
+          }}>{initials}</div>
+          <span style={{ fontSize: "12px", color: theme.textSecondary }}>{userName}</span>
+          <svg 
+            width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style={{ transform: isMenuOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}
+          >
+            <path d="M1 1L5 5L9 1" stroke={theme.textTertiary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+
+        {/* Dropdown Menu */}
+        {isMenuOpen && (
+          <div style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
+            width: "220px",
+            background: "#fff",
+            borderRadius: "16px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05)",
+            border: `1px solid ${theme.borderLight}`,
+            padding: "8px",
+            zIndex: 100,
+            overflow: "hidden",
+            animation: "fadeInScale 0.2s ease-out",
+          }}>
+            <style>
+              {`
+                @keyframes fadeInScale {
+                  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+                  to { opacity: 1; transform: scale(1) translateY(0); }
+                }
+              `}
+            </style>
+            
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${theme.borderLight}`, marginBottom: "4px" }}>
+              <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, marginBottom: "2px" }}>{userName}</div>
+              <div style={{ fontSize: "11px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {userRole}
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                borderRadius: "10px",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#ef4444",
+                fontSize: "13px",
+                textAlign: "left",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#fff1f1"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

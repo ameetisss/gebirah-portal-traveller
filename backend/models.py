@@ -5,6 +5,8 @@ from datetime import datetime
 class LoginRequest(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
+    role: Optional[str] = "traveller"
+
 
 class VolunteerSchedule(BaseModel):
     id: Optional[str] = None
@@ -78,3 +80,25 @@ class Flight(BaseModel):
     price_sgd: float
 
     model_config = ConfigDict(from_attributes=True)
+
+class ItemRequest(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    description: str
+    weight_kg: float
+    urgency: str
+    destination: str
+    reason: Optional[str] = None
+    status: str = "Waiting"
+    arrival_info: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ItemRequestCreate(BaseModel):
+    user_id: Optional[str] = None
+    description: str
+    weight: float # maps to weight_kg
+    urgency: str
+    destination: str
+    reason: Optional[str] = None

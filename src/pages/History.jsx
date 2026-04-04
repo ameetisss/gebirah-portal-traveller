@@ -49,7 +49,13 @@ export default function History() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Badge color={theme.green} bg={theme.greenDim}>Delivered</Badge>
+                    {trip.status === "declined" ? (
+                      <Badge color={theme.red} bg={theme.redDim}>Declined</Badge>
+                    ) : (trip.status === "unavailable" || trip.status === "no_volunteer") ? (
+                      <Badge color={theme.amber} bg={theme.amberDim}>No Volunteer</Badge>
+                    ) : (
+                      <Badge color={theme.green} bg={theme.greenDim}>Delivered</Badge>
+                    )}
                     <span style={{ fontSize: "16px", color: theme.textTertiary }}>&rsaquo;</span>
                   </div>
                 </div>

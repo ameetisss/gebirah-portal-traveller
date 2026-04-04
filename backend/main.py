@@ -10,7 +10,7 @@ from flights import fetch_regional_flights
 from csv_service import get_flight_details, get_csv_head
 from volunteer import get_all_volunteers, get_volunteers_by_day, get_schedule_grouped_by_day, get_volunteer_at_datetime
 from database import get_supabase
-from models import Trip, LoginRequest, TripCreateRequest
+from models import Trip, LoginRequest, TripCreateRequest, ItemRequest, ItemRequestCreate
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,6 +35,7 @@ app.add_middleware(
 
 # Mock user ID for the traveller (in a real app, this comes from Auth)
 MOCK_TRAVELLER_ID = "00000000-0000-0000-0000-000000000001"
+MOCK_REQUESTER_ID = "00000000-0000-0000-0000-000000000002"
 
 class FlightSearchRequest(BaseModel):
     departure_airport: str = "SIN"
@@ -87,14 +88,17 @@ async def login(request: LoginRequest):
         res = query.execute()
         
         if res.data:
-            return {"status": "success", "data": res.data[0]}
+            user_data = res.data[0]
+            # Always trust the role the user selected on the login page
+            user_data["role"] = request.role or user_data.get("role", "traveller")
+            return {"status": "success", "data": user_data}
         else:
             # Create new user
             new_user = {
-                "role": "traveller",
+                "role": request.role or "traveller",
                 "email": request.email,
                 "phone": request.phone,
-                "full_name": request.email.split("@")[0] if request.email else "Traveller"
+                "full_name": request.email.split("@")[0] if request.email else (request.role or "User")
             }
             res_insert = supabase.table("user_profiles").insert(new_user).execute()
             if res_insert.data:
@@ -161,30 +165,58 @@ async def complete_trip(trip_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/api/trips/{trip_id}/status")
+async def update_trip_status(trip_id: str, payload: dict):
+    """Generic status update for a trip."""
+    try:
+        new_status = payload.get("status")
+        if not new_status:
+            raise HTTPException(status_code=400, detail="Status is required")
+            
+        supabase = get_supabase()
+        res = supabase.table("trips").update({"status": new_status}).eq("trips_id", trip_id).execute()
+        
+        if res.data:
+            return {"status": "success", "data": res.data[0]}
+        else:
+            raise HTTPException(status_code=404, detail="Trip not found")
+    except Exception as e:
+        print(f"Error updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 class MatchSelection(BaseModel):
     matches: List[dict]
     total_weight: float
 
 @app.put("/api/trips/{trip_id}/confirm-matches")
 async def confirm_matches(trip_id: str, selection: MatchSelection):
-    """Save the final selected matches and progress to handover stage."""
+    """Save the final selected matches and update item_requests statuses."""
     try:
         supabase = get_supabase()
         
-        # Get trip details to update handover/arrival summaries
+        # 1. Update trip details
         trip_res = supabase.table("trips").select("*").eq("trips_id", trip_id).execute()
-        if not trip_res.data:
-            raise HTTPException(status_code=404, detail="Trip not found")
-            
         trip = trip_res.data[0]
         handover = trip.get("handover_data") or {}
         arrival = trip.get("arrival_data") or {}
         
-        # Update items in summaries
         handover["items"] = selection.matches
         handover["totalWeight"] = selection.total_weight
         arrival["items"] = selection.matches
         arrival["totalWeight"] = selection.total_weight
+        
+        # 1.5. Ensure a volunteer is assigned to the handover
+        if not handover.get("volunteer"):
+            v_res = supabase.table("user_profiles").select("full_name, phone").eq("role", "volunteer").neq("phone", None).execute()
+            if v_res.data:
+                volunteer = random.choice(v_res.data)
+                handover.update({
+                    "volunteer": volunteer["full_name"],
+                    "volunteerPhone": volunteer["phone"],
+                    "volunteerInitials": "".join([n[0] for n in volunteer["full_name"].split()[:2]]).upper(),
+                    "location": f"Terminal {random.randint(1, 4)} Departure Hall",
+                    "landmark": f"Near Check-in Row {random.choice('ABCDEFG')}"
+                })
         
         res = supabase.table("trips").update({
             "match_data": selection.matches,
@@ -194,6 +226,16 @@ async def confirm_matches(trip_id: str, selection: MatchSelection):
             "status": "handover"
         }).eq("trips_id", trip_id).execute()
         
+        # 2. Update status of corresponding item_requests to 'Matched'
+        for match in selection.matches:
+            match_id = match.get("id")
+            # Only update if it's a real request ID (UUID format, not fallback-...)
+            if match_id and not str(match_id).startswith("fallback-") and not str(match_id).startswith("mock-"):
+                supabase.table("item_requests").update({
+                    "status": "Matched",
+                    "arrival_info": f"Matched with Flight {trip.get('flight_number')} to {trip.get('destination')}"
+                }).eq("id", match_id).execute()
+
         return {"status": "success", "data": res.data[0] if res.data else None}
     except Exception as e:
         print(f"Error confirming matches: {e}")
@@ -204,39 +246,112 @@ async def confirm_matches(trip_id: str, selection: MatchSelection):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/matches/generate")
-async def generate_match(weight: float):
-    """Generate up to 3 matches from catalogue_items based on capacity."""
+async def generate_match(weight: float, destination: Optional[str] = None):
+    """Generate up to 3 matches prioritizing real item_requests."""
     try:
         supabase = get_supabase()
-        # Find items that fit the weight
-        res = supabase.table("catalogue_items").select("*").lte("min_weight_kg", weight).execute()
-        items = res.data
         
-        if not items:
-             # Fallback if DB is empty or no fits
-             items = [
-                 {"name": "Clothing", "min_weight_kg": 1.5, "requester_name": "Islamic Relief"},
-                 {"name": "First Aid Kit", "min_weight_kg": 0.5, "requester_name": "Global Relief Fund"},
-                 {"name": "Educational Books", "min_weight_kg": 2.0, "requester_name": "Save the Children"}
-             ]
-        else:
-            import random
-            # Randomize and pick up to 3
-            random.shuffle(items)
-            items = items[:3]
-             
+        # 1. Try to find real user requests that are 'Waiting' and fit the weight
+        # We can also filter by destination if provided (exact or partial)
+        query = supabase.table("item_requests").select("*, user_profiles(full_name)").eq("status", "Waiting").lte("weight_kg", weight)
+        
+        if destination:
+            query = query.ilike("destination", f"%{destination}%")
+            
+        res = query.execute()
+        requests = res.data or []
+        
         data_list = []
-        for item in items:
+        
+        # 2. Map real requests to the UI format
+        for req in requests[:3]:
             data_list.append({
-                "name": item["name"],
-                "weight": item["min_weight_kg"],
-                "requester": item.get("requester_name") or "Global Relief Fund",
-                "description": f"Shipment of {item['name'].lower()}"
+                "id": req["id"], # Store the actual request ID
+                "name": req["description"],
+                "weight": float(req["weight_kg"]),
+                "requester": req.get("user_profiles", {}).get("full_name") or "Relief Coordinator",
+                "description": f"Urgency: {req['urgency']} · {req['destination']}"
             })
+            
+        # 3. If we don't have 3 real requests, fill with catalogue items as fallback
+        if len(data_list) < 3:
+            remaining = 3 - len(data_list)
+            cat_res = supabase.table("catalogue_items").select("*").lte("min_weight_kg", weight).execute()
+            cat_items = cat_res.data or []
+            
+            # Filter out items we already have (by name/description context)
+            existing_names = [d["name"] for d in data_list]
+            for item in cat_items:
+                if len(data_list) >= 3: break
+                if item["name"] not in existing_names:
+                    data_list.append({
+                        "id": f"fallback-{item['id']}",
+                        "name": item["name"],
+                        "weight": float(item["min_weight_kg"]),
+                        "requester": item.get("requester_name") or "Global Relief Fund",
+                        "description": f"Template match from catalogue"
+                    })
+                    
+        # 4. Final hardcoded fallback if still empty
+        if not data_list:
+            data_list = [
+                {"id": "mock-1", "name": "Essential Meds", "weight": 0.5, "requester": "Global Relief Fund", "description": "High Priority"},
+                {"id": "mock-2", "name": "Clothing Pack", "weight": 2.0, "requester": "Islamic Relief", "description": "Standard Support"}
+            ]
             
         return {"status": "success", "data": data_list}
     except Exception as e:
         print(f"Match generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------------------------------------------------------------------------
+# Request endpoints (for Requesters)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/item-requests")
+async def create_item_request(request: ItemRequestCreate):
+    """Save a new item request in Supabase."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("item_requests").insert({
+            "user_id": request.user_id or MOCK_REQUESTER_ID,
+            "description": request.description,
+            "weight_kg": request.weight,
+            "urgency": request.urgency,
+            "destination": request.destination,
+            "reason": request.reason,
+            "status": "Waiting"
+        }).execute()
+        
+        if res.data:
+            return {"status": "success", "data": res.data[0]}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create request in database")
+    except Exception as e:
+        print(f"Error creating item request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/item-requests")
+async def get_item_requests(user_id: Optional[str] = None):
+    """Fetch active (non-delivered) requests for the requester."""
+    try:
+        target_id = user_id or MOCK_REQUESTER_ID
+        supabase = get_supabase()
+        # Fetch requests where status is not 'Delivered'
+        res = supabase.table("item_requests").select("*").eq("user_id", target_id).neq("status", "Delivered").execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/item-requests/history")
+async def get_item_request_history(user_id: Optional[str] = None):
+    """Fetch historical (delivered) requests for the requester."""
+    try:
+        target_id = user_id or MOCK_REQUESTER_ID
+        supabase = get_supabase()
+        res = supabase.table("item_requests").select("*").eq("user_id", target_id).eq("status", "Delivered").execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------------------------------------------------------------------
@@ -293,8 +408,8 @@ async def lookup_volunteer(datetime: str):
                     "volunteer": name,
                     "volunteerInitials": initials,
                     "volunteerPhone": v_data["phone"],
-                    "location": "T3 Departure Hall, Level 2",
-                    "landmark": "Near check-in row G, next to information counter"
+                    "location": f"Changi T{random.randint(1, 4)} Departure Hall",
+                    "landmark": f"Near Check-in Row {random.choice('ABCDEFG')}, Level 2"
                 }
             }
         return {"status": "unavailable", "data": None}

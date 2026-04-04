@@ -34,7 +34,13 @@ export default function TripDetailModal({ trip, onClose }) {
             <div style={{ fontSize: "18px", fontWeight: "600", letterSpacing: "-0.4px", marginBottom: "4px" }}>
               {trip.route}
             </div>
-            <Badge color={theme.green} bg={theme.greenDim}>&#10003; Delivered</Badge>
+            {trip.status === "declined" ? (
+              <Badge color={theme.red} bg={theme.redDim}>Declined</Badge>
+            ) : (trip.status === "unavailable" || trip.status === "no_volunteer") ? (
+              <Badge color={theme.amber} bg={theme.amberDim}>No Volunteer</Badge>
+            ) : (
+              <Badge color={theme.green} bg={theme.greenDim}>&#10003; Delivered</Badge>
+            )}
           </div>
           <button
             onClick={onClose}

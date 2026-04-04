@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme } from "../theme";
@@ -30,6 +32,34 @@ const HISTORY_ITEMS = [
 ];
 
 export default function RequesterHistory() {
+  const { userId } = useAuth();
+  const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  async function fetchHistory() {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`http://localhost:8000/api/item-requests/history?user_id=${userId || ""}`);
+      const result = await res.json();
+      if (result.status === "success") {
+        const mapped = result.data.map(req => ({
+          id: req.id,
+          title: req.description,
+          meta: `${req.weight_kg} kg · ${req.destination} · Delivered ${new Date(req.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+          route: req.arrival_info || "Completed delivery",
+        }));
+        setItems(mapped);
+      }
+    } catch (e) {
+      console.error("Fetch history error:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }
   return (
     <div style={{ minHeight: "100vh", background: "#FFFFFF", color: theme.textPrimary, fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif" }}>
       <Topbar
@@ -51,29 +81,35 @@ export default function RequesterHistory() {
         </div>
 
         <Card style={{ background: "#F8F4ED", border: "1px solid #E7DED0", borderRadius: "20px" }}>
-          <div style={{ padding: "0 26px" }}>
-            {HISTORY_ITEMS.map((item, index) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "22px 0",
-                  borderBottom: index < HISTORY_ITEMS.length - 1 ? "1px solid #E7DED0" : "none",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "16px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: "18px", fontWeight: "600", color: theme.textPrimary, marginBottom: "4px" }}>{item.title}</div>
-                  <div style={{ fontSize: "14px", color: "#786F62", marginBottom: "4px" }}>{item.meta}</div>
-                  <div style={{ fontSize: "14px", color: "#4F473C" }}>{item.route}</div>
-                </div>
-                <Badge color={theme.green} bg="#E5F3D9">Delivered</Badge>
+            {isLoading ? (
+              <div style={{ padding: "40px", textAlign: "center", color: theme.textTertiary }}>Loading history...</div>
+            ) : items.length === 0 ? (
+              <div style={{ padding: "60px 40px", textAlign: "center", color: theme.textSecondary }}>
+                No completed requests found in your history.
               </div>
-            ))}
-          </div>
+            ) : (
+              items.map((item, index) => (
+                <div
+                  key={item.id}
+                  style={{
+                    padding: "22px 0",
+                    borderBottom: index < items.length - 1 ? "1px solid #E7DED0" : "none",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "16px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "18px", fontWeight: "600", color: theme.textPrimary, marginBottom: "4px" }}>{item.title}</div>
+                    <div style={{ fontSize: "14px", color: "#786F62", marginBottom: "4px" }}>{item.meta}</div>
+                    <div style={{ fontSize: "14px", color: "#4F473C" }}>{item.route}</div>
+                  </div>
+                  <Badge color={theme.green} bg="#E5F3D9">Delivered</Badge>
+                </div>
+              ))
+            )}
         </Card>
       </div>
     </div>
