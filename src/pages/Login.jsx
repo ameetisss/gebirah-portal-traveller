@@ -181,6 +181,10 @@ export default function Login() {
         Not a traveller?{" "}
         <span style={{ color: theme.accent, cursor: "pointer" }}>Request access</span>
       </div>
+      <div style={{ marginTop: "10px", fontSize: "12px", color: theme.textTertiary }}>
+        Are you a volunteer?{" "}
+        <span style={{ color: theme.teal, cursor: "pointer" }} onClick={() => navigate("/volunteer/login")}>Sign in here</span>
+      </div>
     </div>
   );
 }
