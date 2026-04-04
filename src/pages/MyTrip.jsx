@@ -4,14 +4,21 @@ import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
 import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
-import { useTrip, STAGES, DEMO_MATCH, DEMO_ARRIVAL, DEMO_HANDOVER } from "../context/TripContext";
+import { useTrip, STAGES } from "../context/TripContext";
 
 const STAGE_ORDER = [STAGES.AWAITING, STAGES.MATCH, STAGES.HANDOVER, STAGES.DEPARTED, STAGES.ARRIVAL, STAGES.COMPLETED];
 
 // ── Stage 1: Register ──────────────────────────────────────────
 
 function RegisterView({ onSubmit }) {
-  const [form, setForm] = useState({ destination: "", flight: "", date: "", weight: "", departure_time: "" });
+  const [form, setForm] = useState({ 
+    destination: "", 
+    flight: "", 
+    date: "", 
+    weight: "", 
+    departure_time: "",
+    allocationMode: "manual" // "manual" or "auto"
+  });
   const [isSearching, setIsSearching] = useState(false);
   const [flightOptions, setFlightOptions] = useState([]);
   const [flightNotFound, setFlightNotFound] = useState(false);
@@ -85,6 +92,21 @@ function RegisterView({ onSubmit }) {
     }
   }
 
+  const allocationModes = [
+    { 
+      key: "manual", 
+      label: "I'll select my items", 
+      desc: "See all matching requests and pick what you'd like to carry.",
+      icon: "📋"
+    },
+    { 
+      key: "auto", 
+      label: "Auto-allocate for me", 
+      desc: "Skip searching — the system will automatically assign items for you.",
+      icon: "⚡"
+    }
+  ];
+
   return (
     <div style={{ maxWidth: "480px", margin: "0 auto" }}>
       <div style={{ marginBottom: "28px" }}>
@@ -114,6 +136,8 @@ function RegisterView({ onSubmit }) {
             <input
               type="date"
               value={form.date}
+              min="2026-05-01"
+              max="2026-05-31"
               onChange={e => set("date", e.target.value)}
               style={{
                 ...inputStyle,
@@ -184,6 +208,42 @@ function RegisterView({ onSubmit }) {
             <FieldLabel>Spare baggage (kg)</FieldLabel>
             <input type="number" placeholder="0.0" min="0" step="0.5"
               value={form.weight} onChange={e => set("weight", e.target.value)} style={inputStyle} />
+          </div>
+
+          <div>
+            <FieldLabel>How would you like to match?</FieldLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
+              {allocationModes.map(mode => {
+                const isActive = form.allocationMode === mode.key;
+                return (
+                  <div 
+                    key={mode.key}
+                    onClick={() => set("allocationMode", mode.key)}
+                    style={{
+                      padding: "16px",
+                      borderRadius: "12px",
+                      border: `1.5px solid ${isActive ? theme.accent : theme.border}`,
+                      background: isActive ? theme.accentDim : theme.surface,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      position: "relative"
+                    }}
+                  >
+                    {isActive && (
+                      <div style={{ position: "absolute", top: "10px", right: "10px", color: theme.accent, fontSize: "14px" }}>✓</div>
+                    )}
+                    <div style={{ fontSize: "20px" }}>{mode.icon}</div>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, marginBottom: "2px" }}>{mode.label}</div>
+                      <div style={{ fontSize: "11px", color: theme.textSecondary, lineHeight: "1.4" }}>{mode.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Helper hint when flight not yet confirmed */}
@@ -328,49 +388,110 @@ function AwaitingView({ trip, onMatchFound }) {
 
 // ── Stage 3: Match Received ────────────────────────────────────
 
-function MatchView({ trip, match, onAccept, onDecline }) {
+function MatchView({ trip, candidateMatches, onAccept, onDecline }) {
+  const [selected, setSelected] = useState(candidateMatches.map((_, i) => i)); // Default select all
+  const totalWeight = candidateMatches
+    .filter((_, i) => selected.includes(i))
+    .reduce((sum, item) => sum + item.weight, 0);
+
+  const toggle = (i) => {
+    setSelected(prev => prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]);
+  };
+
+  const isOverWeight = totalWeight > trip.weight;
+
   return (
     <div style={{ maxWidth: "520px", margin: "0 auto" }}>
       <div style={{ background: theme.accentDim, border: `1px solid ${theme.accent}40`, borderRadius: "10px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
         <span style={{ fontSize: "22px" }}>&#128236;</span>
         <div>
-          <div style={{ fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "2px" }}>New match found</div>
-          <div style={{ fontSize: "12px", color: theme.textSecondary }}>A request matches your trip to {trip.destination}</div>
+          <div style={{ fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "2px" }}>New items found</div>
+          <div style={{ fontSize: "12px", color: theme.textSecondary }}>Select which items you can carry for your trip to {trip.destination}</div>
         </div>
       </div>
 
       <Card>
-        <CardHeader title="Match request" right={<Badge color={theme.amber} bg={theme.amberDim}>Awaiting response</Badge>} />
+        <CardHeader title="Available matches" right={<Badge color={theme.amber} bg={theme.amberDim}>Selection required</Badge>} />
         <div style={{ padding: "20px" }}>
-          <div style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: "10px", padding: "16px", marginBottom: "14px" }}>
-            <div style={{ fontSize: "11px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600", marginBottom: "8px" }}>Item to carry</div>
-            <div style={{ fontSize: "18px", fontWeight: "600", letterSpacing: "-0.4px", marginBottom: "4px" }}>{match.item}</div>
-            <div style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "16px" }}>{match.description}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
-              {[
-                { label: "Weight",       value: `${match.weight} kg` },
-                { label: "Destination",  value: trip.destination },
-                { label: "Requested by", value: match.requester },
-              ].map(d => (
-                <div key={d.label}>
-                  <div style={{ fontSize: "10px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600", marginBottom: "3px" }}>{d.label}</div>
-                  <div style={{ fontSize: "13px", fontWeight: "500", color: theme.textPrimary }}>{d.value}</div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+            {candidateMatches.map((item, i) => {
+              const isActive = selected.includes(i);
+              return (
+                <div 
+                  key={i} 
+                  onClick={() => toggle(i)}
+                  style={{ 
+                    padding: "16px", 
+                    border: `1px solid ${isActive ? theme.accent : theme.border}`, 
+                    borderRadius: "12px", 
+                    background: isActive ? theme.accentDim : theme.surface, 
+                    cursor: "pointer", 
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    boxShadow: isActive ? `0 4px 12px ${theme.accent}15` : "none"
+                  }}
+                >
+                  {/* Custom Tickbox */}
+                  <div style={{
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "6px",
+                    border: `2px solid ${isActive ? theme.accent : theme.borderLight}`,
+                    background: isActive ? theme.accent : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                    flexShrink: 0
+                  }}>
+                    {isActive && (
+                      <svg width="12" height="10" viewBox="0 0 12 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 5L4.5 8.5L11 1.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2px" }}>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{item.name}</div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: theme.accent }}>{item.weight} kg</div>
+                    </div>
+                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "4px" }}>{item.description}</div>
+                    <div style={{ fontSize: "10px", color: theme.textTertiary, textTransform: "uppercase", fontWeight: "600", letterSpacing: "0.02em" }}>
+                      Requested by: {item.requester}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: theme.greenDim, border: `1px solid ${theme.green}40`, borderRadius: "8px", marginBottom: "20px" }}>
-            <span style={{ fontSize: "12px", color: theme.textSecondary }}>Fits within your capacity</span>
-            <span style={{ fontSize: "13px", fontWeight: "600", color: theme.green }}>{match.weight} kg of {trip.weight} kg used</span>
+          <div style={{ 
+            display: "flex", justifyContent: "space-between", alignItems: "center", 
+            padding: "14px", background: isOverWeight ? theme.redDim : theme.greenDim, 
+            border: `1px solid ${isOverWeight ? "#ef4444" : theme.green}40`, borderRadius: "10px", marginBottom: "20px" 
+          }}>
+            <div>
+              <div style={{ fontSize: "11px", color: theme.textSecondary }}>Total baggage used</div>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: isOverWeight ? "#ef4444" : theme.textPrimary }}>
+                {totalWeight.toFixed(1)} kg / {trip.weight} kg
+              </div>
+            </div>
+            {isOverWeight && <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "600" }}>Over capacity!</span>}
           </div>
 
           <div style={{ display: "flex", gap: "10px" }}>
-            <button style={{ ...btn("ghost"), flex: 1 }} onClick={onDecline}>Decline</button>
-            <button style={{ ...btn("primary"), flex: 2 }} onClick={onAccept}>Accept match</button>
-          </div>
-          <div style={{ fontSize: "11px", color: theme.textTertiary, textAlign: "center", marginTop: "10px" }}>
-            You have 24 hours to respond before this match expires
+            <button style={{ ...btn("ghost"), flex: 1 }} onClick={onDecline}>Decline all</button>
+            <button 
+              style={{ ...btn("primary"), flex: 2, opacity: (selected.length > 0 && !isOverWeight) ? 1 : 0.4 }} 
+              disabled={selected.length === 0 || isOverWeight}
+              onClick={() => onAccept(selected)}
+            >
+              Accept {selected.length} item{selected.length !== 1 ? 's' : ''}
+            </button>
           </div>
         </div>
       </Card>
@@ -381,6 +502,10 @@ function MatchView({ trip, match, onAccept, onDecline }) {
 // ── Stage 4: Handover Brief ────────────────────────────────────
 
 function HandoverView({ trip, handover, onConfirm, onViewTrips }) {
+  const h = handover || {};
+  const items = h.items || (trip.matchData ? (Array.isArray(trip.matchData) ? trip.matchData : [trip.matchData]) : []);
+  const totalWeight = h.totalWeight ?? items.reduce((s, i) => s + (i.weight || 0), 0);
+
   return (
     <div style={{ maxWidth: "580px", margin: "0 auto" }}>
       <div style={{ marginBottom: "24px" }}>
@@ -394,25 +519,33 @@ function HandoverView({ trip, handover, onConfirm, onViewTrips }) {
         <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
           <div style={{ fontSize: "20px" }}>👤</div>
           <div>
-            <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "3px" }}>{handover.volunteer}</div>
-            <div style={{ fontSize: "13px", color: theme.textSecondary }}>{handover.volunteerPhone}</div>
+            <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "3px" }}>
+              {h.volunteer || <span style={{ color: theme.textTertiary, fontStyle: "italic" }}>Volunteer will be assigned soon</span>}
+            </div>
+            <div style={{ fontSize: "13px", color: theme.textSecondary }}>
+              {h.volunteerPhone || ""}
+            </div>
           </div>
         </div>
       </Card>
 
       {/* Items */}
       <Card style={{ marginBottom: "14px" }}>
-        <CardHeader title="Items to carry" right={<Badge color={theme.accent} bg={theme.accentDim}>{handover.totalWeight} kg total</Badge>} />
+        <CardHeader title="Items to carry" right={<Badge color={theme.accent} bg={theme.accentDim}>{totalWeight} kg total</Badge>} />
         <div style={{ padding: "0 20px" }}>
-          {handover.items.map((item, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: i < handover.items.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+          {items.length > 0 ? items.map((item, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: i < items.length - 1 ? `1px solid ${theme.border}` : "none" }}>
               <div>
                 <div style={{ fontSize: "13px", fontWeight: "500", color: theme.textPrimary, marginBottom: "2px" }}>{item.name}</div>
                 <div style={{ fontSize: "11px", color: theme.textSecondary }}>{item.description} &middot; for {item.requester}</div>
               </div>
               <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textSecondary }}>{item.weight} kg</div>
             </div>
-          ))}
+          )) : (
+            <div style={{ padding: "16px 0", fontSize: "13px", color: theme.textTertiary, fontStyle: "italic" }}>
+              No items assigned yet.
+            </div>
+          )}
         </div>
       </Card>
 
@@ -423,13 +556,13 @@ function HandoverView({ trip, handover, onConfirm, onViewTrips }) {
           <div style={{ background: theme.accentDim, border: `1px solid ${theme.accent}40`, borderRadius: "10px", padding: "16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontSize: "11px", color: theme.accentLight, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "600", marginBottom: "4px" }}>When</div>
-              <div style={{ fontSize: "20px", fontWeight: "600", color: theme.textPrimary, letterSpacing: "-0.5px" }}>{handover.date} &middot; {handover.time}</div>
+              <div style={{ fontSize: "20px", fontWeight: "600", color: theme.textPrimary, letterSpacing: "-0.5px" }}>{h.date || trip.date} &middot; {h.time || "—"}</div>
             </div>
             <Badge color={theme.amber} bg={theme.amberDim}>Upcoming</Badge>
           </div>
           {[
-            { label: "Location", value: handover.location, icon: "&#128205;" },
-            { label: "Landmark", value: handover.landmark, icon: "&#127991;" },
+            { label: "Location", value: h.location || "To be confirmed", icon: "&#128205;" },
+            { label: "Landmark", value: h.landmark || "—", icon: "&#127991;" },
           ].map((d, i, arr) => (
             <div key={d.label} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "12px 0", borderBottom: i < arr.length - 1 ? `1px solid ${theme.border}` : "none" }}>
               <span style={{ fontSize: "16px", marginTop: "1px" }} dangerouslySetInnerHTML={{ __html: d.icon }} />
@@ -449,7 +582,7 @@ function HandoverView({ trip, handover, onConfirm, onViewTrips }) {
         View other trips
       </button>
       <div style={{ fontSize: "11px", color: theme.textTertiary, textAlign: "center", marginTop: "10px" }}>
-        Tap confirm after you've received all items from {handover.volunteer} before boarding
+        Tap confirm after you've received all items from {h.volunteer || "the volunteer"} before boarding
       </div>
     </div>
   );
@@ -497,7 +630,7 @@ function DepartedView({ trip, handover, arrival, onLanded }) {
 // ── Stage 6: Arrival Handover ─────────────────────────────────
 
 function ArrivalView({ trip, arrival, onConfirm }) {
-  const [checked, setChecked] = useState(Object.fromEntries(arrival.items.map((_, i) => [i, false])));
+  const [checked, setChecked] = useState(Object.fromEntries((arrival.items || []).map((_, i) => [i, false])));
   const allChecked = Object.values(checked).every(Boolean);
 
   return (
@@ -542,7 +675,7 @@ function ArrivalView({ trip, arrival, onConfirm }) {
       <Card style={{ marginBottom: "20px" }}>
         <CardHeader title="Items to hand over" right={<Badge color={theme.accent} bg={theme.accentDim}>{arrival.totalWeight} kg</Badge>} />
         <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {arrival.items.map((item, i) => (
+          {(arrival.items || []).map((item, i) => (
             <div
               key={i}
               style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", background: checked[i] ? theme.greenDim : theme.surface, border: `1px solid ${checked[i] ? theme.green + "60" : theme.border}`, borderRadius: "8px", cursor: "pointer", transition: "all 0.15s" }}
@@ -622,8 +755,8 @@ const STAGE_LABEL = {
 
 export default function MyTrip() {
   const navigate = useNavigate();
-  const { trips, activeTripId, setActiveTripId, addTrip,
-          stage, setStage, tripData, activeHandover, resetTrip, completeTrip } = useTrip();
+  const { trips, activeTripId, setActiveTripId, addTrip, confirmMatches,
+          stage, setStage, tripData, activeHandover, activeMatch, activeArrival, resetTrip, completeTrip } = useTrip();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
 
@@ -641,7 +774,7 @@ export default function MyTrip() {
     }}>
       {showConfirm && (
         <ConfirmModal
-          items={activeHandover.items}
+          items={activeHandover?.items || []}
           onClose={() => { setShowConfirm(false); setStage(STAGES.DEPARTED); }}
         />
       )}
@@ -744,15 +877,15 @@ export default function MyTrip() {
         {!displayRegister && stage === STAGES.MATCH && (
           <MatchView
             trip={tripData}
-            match={DEMO_MATCH}
-            onAccept={() => setStage(STAGES.HANDOVER)}
+            candidateMatches={tripData.candidateMatches || []}
+            onAccept={(indices) => confirmMatches(indices)}
             onDecline={() => setStage(STAGES.AWAITING)}
           />
         )}
         {!displayRegister && stage === STAGES.HANDOVER && (
           <HandoverView
             trip={tripData}
-            handover={activeHandover}
+            handover={activeHandover || {}}
             onConfirm={() => setShowConfirm(true)}
             onViewTrips={() => navigate("/history")}
           />
@@ -760,15 +893,15 @@ export default function MyTrip() {
         {!displayRegister && stage === STAGES.DEPARTED && (
           <DepartedView
             trip={tripData}
-            handover={activeHandover}
-            arrival={DEMO_ARRIVAL}
+            handover={activeHandover || {}}
+            arrival={activeArrival || {}}
             onLanded={() => setStage(STAGES.ARRIVAL)}
           />
         )}
         {!displayRegister && stage === STAGES.ARRIVAL && (
           <ArrivalView
             trip={tripData}
-            arrival={DEMO_ARRIVAL}
+            arrival={activeArrival || { items: [] }}
             onConfirm={() => { completeTrip(); setStage(STAGES.COMPLETED); }}
           />
         )}

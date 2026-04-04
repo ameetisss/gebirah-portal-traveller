@@ -1,0 +1,14 @@
+{
+  "items": [
+    {"name": "medication", "min_weight_kg": 1, "max_weight_kg": 2},
+    {"name": "wheelchair", "min_weight_kg": 10, "max_weight_kg": 10},
+    {"name": "books", "min_weight_kg": 1, "max_weight_kg": 5},
+    {"name": "walking_aid_braces_contraptions", "min_weight_kg": 1, "max_weight_kg": 7},
+    {"name": "school_supplies_stationery", "min_weight_kg": 1, "max_weight_kg": 3},
+    {"name": "art_materials", "min_weight_kg": 1, "max_weight_kg": 4},
+    {"name": "torchlight", "min_weight_kg": 1, "max_weight_kg": 2},
+    {"name": "solar_lamps", "min_weight_kg": 1, "max_weight_kg": 4},
+    {"name": "sports_equipment", "min_weight_kg": 1, "max_weight_kg": 10},
+    {"name": "maternal_aids", "min_weight_kg": 1, "max_weight_kg": 6}
+  ]
+}

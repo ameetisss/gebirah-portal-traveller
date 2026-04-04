@@ -4,10 +4,9 @@ import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
 import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
-import { useTrip, DEMO_HANDOVER, DEMO_ARRIVAL, DEMO_MATCH, STAGES } from "../context/TripContext";
+import { useTrip, STAGES } from "../context/TripContext";
 import { useAuth } from "../context/AuthContext";
 import TripDetailModal from "../components/TripDetailModal";
-import { staticHistory } from "../data/historyData";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -25,8 +24,11 @@ export default function Dashboard() {
 
   // Per-trip arrival checklist: { [tripId]: { [itemIndex]: bool } }
   const [arrivalCheckedMap, setArrivalCheckedMap] = useState({});
-  const getArrivalChecked = (tripId) =>
-    arrivalCheckedMap[tripId] ?? Object.fromEntries(DEMO_ARRIVAL.items.map((_, i) => [i, false]));
+  const getArrivalChecked = (tripId) => {
+    const trip = trips.find(t => t.id === tripId);
+    const items = trip?.arrivalData?.items || [];
+    return arrivalCheckedMap[tripId] ?? Object.fromEntries(items.map((_, i) => [i, false]));
+  };
   const setArrivalChecked = (tripId, updater) =>
     setArrivalCheckedMap(prev => ({
       ...prev,
@@ -44,32 +46,41 @@ export default function Dashboard() {
   }
 
   const stageLabelShort = s => ({
+    "upcoming":          "Awaiting match",   // DB default status
     [STAGES.AWAITING]:  "Awaiting match",
     [STAGES.MATCH]:     "Match found",
     [STAGES.HANDOVER]:  "Handover",
     [STAGES.DEPARTED]:  "En route",
     [STAGES.ARRIVAL]:   "Arrival",
     [STAGES.COMPLETED]: "Completed",
+    [STAGES.NO_VOLUNTEER]: "No availability",
   }[s] ?? s);
 
   // ── Multi-trip aggregates ─────────────────────────────────────
   const MATCHED_STAGES   = [STAGES.HANDOVER, STAGES.DEPARTED, STAGES.ARRIVAL, STAGES.COMPLETED];
   const matchedTrips     = trips.filter(t => MATCHED_STAGES.includes(t.stage));
   const totalDeclaredKg  = +(trips.reduce((s, t) => s + parseFloat(t.weight || 0), 0)).toFixed(1);
-  const totalAllocatedKg = +(matchedTrips.length * DEMO_HANDOVER.totalWeight).toFixed(1);
+  // matchData is an array of items — sum their weights
+  const totalAllocatedKg = +(matchedTrips.reduce((s, t) => {
+    if (!t.matchData) return s;
+    const arr = Array.isArray(t.matchData) ? t.matchData : [t.matchData];
+    return s + arr.reduce((a, item) => a + parseFloat(item.weight || 0), 0);
+  }, 0)).toFixed(1);
   const totalRemainingKg = +(totalDeclaredKg - totalAllocatedKg).toFixed(1);
 
-  // All matched items across every accepted trip
-  const allMatchedItems = matchedTrips.flatMap(t =>
-    DEMO_HANDOVER.items.map(item => ({ ...item, destination: t.destination, tripFlight: t.flight }))
-  );
+  // All matched items across every accepted trip (matchData is an array)
+  const allMatchedItems = matchedTrips.flatMap(t => {
+    if (!t.matchData) return [];
+    const arr = Array.isArray(t.matchData) ? t.matchData : [t.matchData];
+    return arr.map(item => ({ ...item, destination: t.destination, tripFlight: t.flight }));
+  });
 
-  // ── Active-trip derived values (used in per-trip card rendering) ──
-  const handoverDate = matchAccepted ? activeHandover.date     : "Today";
-  const handoverTime = matchAccepted ? activeHandover.time     : "12:30";
-  const handoverLoc  = matchAccepted ? activeHandover.location : "T3 Departure hall, Level 2";
-  const handoverMeet = matchAccepted
-    ? `${activeHandover.volunteer} \u00b7 ${activeHandover.volunteerPhone}`
+  // ── Active-trip derived values — use optional chaining in case handover_data is null in DB ──
+  const handoverDate = activeHandover?.date     ?? "TBC";
+  const handoverTime = activeHandover?.time     ?? "—";
+  const handoverLoc  = activeHandover?.location ?? "T3 Departure hall, Level 2";
+  const handoverMeet = activeHandover
+    ? `${activeHandover.volunteer ?? "Volunteer"} \u00b7 ${activeHandover.volunteerPhone ?? ""}`
     : "Nurul A. \u00b7 +65 9123 4567";
 
   // ── Page subtitle ─────────────────────────────────────────────
@@ -78,14 +89,14 @@ export default function Dashboard() {
     ? "Register a trip to start carrying items to those in need"
     : trips.length > 1
       ? `${trips.length} active trips \u00b7 ${matchedTrips.length} ${matchedTrips.length === 1 ? "match" : "matches"} accepted`
-    : stage === STAGES.DEPARTED  ? `En route to ${tripData.destination} \u00b7 Tap when landed`
+    : stage === STAGES.DEPARTED  ? `En route to ${tripData?.destination ?? "your destination"} \u00b7 Tap when landed`
     : stage === STAGES.ARRIVAL   ? `Arrived \u00b7 Hand over items to local volunteer`
     : stage === STAGES.COMPLETED ? `Request completed \u00b7 Items delivered`
     : matchAccepted ? `Handover on ${handoverDate} at ${handoverTime} \u00b7 ${handoverLoc}`
-    : `Trip to ${tripData.destination} registered \u00b7 Searching for a match`;
+    : `Trip to ${tripData?.destination ?? "your destination"} registered \u00b7 Searching for a match`;
 
   // Combined history
-  const allHistory = [...completedTrips, ...staticHistory];
+  const allHistory = [...completedTrips];
 
   // ── Metrics ───────────────────────────────────────────────────
   const metrics = [
@@ -111,7 +122,7 @@ export default function Dashboard() {
     },
     {
       label: "Trips completed",
-      value: String(completedTrips.length + 3),
+      value: String(completedTrips.length),
       sub: "since joining",
       color: theme.green,
     },
@@ -125,7 +136,7 @@ export default function Dashboard() {
       {selectedTrip && <TripDetailModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} />}
       {showConfirm && (
         <ConfirmModal
-          items={DEMO_HANDOVER.items}
+          items={activeHandover?.items || []}
           onClose={() => { setShowConfirm(false); setStage(STAGES.DEPARTED); }}
         />
       )}
@@ -189,11 +200,13 @@ export default function Dashboard() {
                   {trips.map((trip, index) => {
                     const tCap      = parseFloat(trip.weight);
                     const tMatched  = MATCHED_STAGES.includes(trip.stage);
-                    const tAlloc    = tMatched ? DEMO_HANDOVER.totalWeight : 0;
+                    // matchData is an array of items — sum their weights
+                    const tMatchArr = Array.isArray(trip.matchData) ? trip.matchData : (trip.matchData ? [trip.matchData] : []);
+                    const tAlloc    = tMatched && tMatchArr.length > 0 ? tMatchArr.reduce((a, item) => a + parseFloat(item.weight || 0), 0) : 0;
                     const tPct      = tCap > 0 ? (tAlloc / tCap) * 100 : 0;
-                    const tHandover = { ...DEMO_HANDOVER, date: trip.date };
+                    const tHandover = trip.handoverData ? { ...trip.handoverData, date: trip.date } : {};
                     const tChecked  = getArrivalChecked(trip.id);
-                    const tAllChecked = Object.values(tChecked).every(Boolean);
+                    const tAllChecked = Object.keys(tChecked).length > 0 && Object.values(tChecked).every(Boolean);
                     const isLast    = index === trips.length - 1;
 
                     return (
@@ -243,20 +256,19 @@ export default function Dashboard() {
                         )}
 
                         {/* MATCH */}
-                        {trip.stage === STAGES.MATCH && (
+                        {trip.stage === STAGES.MATCH && trip.candidateMatches && (
                           <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: "8px", padding: "12px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                              <span>&#128236;</span>
-                              <span style={{ fontSize: "12px", fontWeight: "600", color: theme.accent }}>New match \u2014 {DEMO_MATCH.item} &middot; {DEMO_MATCH.weight} kg</span>
+                            <div style={{ fontSize: "12px", fontWeight: "600", color: theme.accent, marginBottom: "8px" }}>
+                              {trip.candidateMatches.length} items found for your trip
                             </div>
                             <div style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "10px" }}>
-                              {DEMO_MATCH.requester} &middot; fits {DEMO_MATCH.weight} of {trip.weight} kg
+                              {trip.candidateMatches.map(m => m.name).join(", ")}
                             </div>
                             <div style={{ display: "flex", gap: "8px" }}>
                               <button style={{ ...btn("ghost"), flex: 1, padding: "7px", fontSize: "12px" }}
                                 onClick={() => setStageForTrip(trip.id, STAGES.AWAITING)}>Decline</button>
                               <button style={{ ...btn("primary"), flex: 2, padding: "7px", fontSize: "12px" }}
-                                onClick={() => setStageForTrip(trip.id, STAGES.HANDOVER)}>Accept match</button>
+                                onClick={() => navigate("/mytrip")}>Select Items</button>
                             </div>
                           </div>
                         )}
@@ -280,7 +292,7 @@ export default function Dashboard() {
                         {trip.stage === STAGES.DEPARTED && (
                           <>
                             <div style={{ background: theme.accentDim, border: `1px solid ${theme.accent}40`, borderRadius: "8px", padding: "10px 12px", marginBottom: "10px" }}>
-                              <div style={{ fontSize: "11px", color: theme.accent, fontWeight: "500" }}>&#9992; En route &middot; local volunteer on arrival: {DEMO_ARRIVAL.volunteer}</div>
+                              <div style={{ fontSize: "11px", color: theme.accent, fontWeight: "500" }}>&#9992; En route &middot; local volunteer on arrival: {trip.arrivalData?.volunteer || "Unknown"}</div>
                             </div>
                             <button style={{ ...btn("primary"), width: "100%", padding: "8px", fontSize: "12px" }}
                               onClick={() => setStageForTrip(trip.id, STAGES.ARRIVAL)}>
@@ -293,10 +305,10 @@ export default function Dashboard() {
                         {trip.stage === STAGES.ARRIVAL && (
                           <>
                             <div style={{ fontSize: "11px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600", marginBottom: "8px" }}>
-                              Hand over to {DEMO_ARRIVAL.volunteer}
+                              Hand over to {trip.arrivalData?.volunteer || "Unknown"}
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "5px", marginBottom: "10px" }}>
-                              {DEMO_ARRIVAL.items.map((item, i) => (
+                              {trip.arrivalData?.items?.map((item, i) => (
                                 <div key={i}
                                   style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", background: tChecked[i] ? theme.greenDim : theme.surface, border: `1px solid ${tChecked[i] ? theme.green + "60" : theme.border}`, borderRadius: "7px", cursor: "pointer", transition: "all 0.15s" }}
                                   onClick={() => setArrivalChecked(trip.id, c => ({ ...c, [i]: !c[i] }))}

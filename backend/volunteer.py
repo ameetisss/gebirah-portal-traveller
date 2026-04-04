@@ -1,70 +1,76 @@
-import json
-import os
 from datetime import datetime
+import random
 from typing import List, Optional
+from database import get_supabase
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "volunteer.json")
-
-DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-
-def load_volunteers() -> List[dict]:
-    """Load and return all volunteer records from the JSON file."""
-    with open(DATA_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
+def get_supabase():
+    from database import supabase
+    return supabase
 
 def get_all_volunteers() -> List[dict]:
-    """Return the full list of volunteer shift entries."""
-    return load_volunteers()
-
+    """Return all volunteer schedules from Supabase."""
+    res = get_supabase().table("volunteer_schedules").select(
+        "id, day_of_week, start_time, end_time, volunteers(user_id, reliability_score)"
+    ).execute()
+    return res.data
 
 def get_volunteers_by_day(day: str) -> List[dict]:
     """Return volunteer shifts filtered by a specific day (case-insensitive)."""
-    volunteers = load_volunteers()
-    return [v for v in volunteers if v["day"].lower() == day.lower()]
-
-
-def get_volunteers_by_name(name: str) -> List[dict]:
-    """Return all shifts for a specific volunteer (case-insensitive)."""
-    volunteers = load_volunteers()
-    return [v for v in volunteers if v["volunteer_name"].lower() == name.lower()]
-
-
-def get_schedule_grouped_by_day() -> dict:
-    """Return the full schedule grouped by day in weekly order."""
-    volunteers = load_volunteers()
-    grouped: dict = {day: [] for day in DAYS_ORDER}
-    for entry in volunteers:
-        day = entry["day"]
-        if day in grouped:
-            grouped[day].append(entry)
-    for day in grouped:
-        grouped[day].sort(key=lambda x: x["start_time"])
-    return grouped
-
+    res = get_supabase().table("volunteer_schedules").select(
+        "*"
+    ).ilike("day_of_week", day).execute()
+    return res.data
 
 def get_volunteer_at_datetime(dt_str: str) -> Optional[str]:
     """
-    Given an ISO 8601 datetime string (e.g. '2026-03-24T14:30:00'),
-    return the name of the volunteer whose shift covers that moment,
-    or None if no volunteer is on duty.
-
-    Matching logic:
-      - The weekday derived from the date must match the shift's 'day' field.
-      - The time must satisfy: start_time <= query_time < end_time.
+    Query Supabase for a volunteer whose schedule covers the given ISO datetime string.
     """
     dt = datetime.fromisoformat(dt_str)
     query_day = dt.strftime("%A")          # e.g. "Monday"
-    query_time = dt.time()                  # e.g. 14:30:00
+    query_time = dt.strftime("%H:%M:%S")    # e.g. 14:30:00
 
-    volunteers = load_volunteers()
-    for entry in volunteers:
-        if entry["day"] != query_day:
-            continue
-        shift_start = datetime.strptime(entry["start_time"], "%H:%M").time()
-        shift_end   = datetime.strptime(entry["end_time"],   "%H:%M").time()
-        if shift_start <= query_time < shift_end:
-            return entry["volunteer_name"]
+    # Query schedules that match the day of week
+    res = get_supabase().table("volunteer_schedules").select(
+        "id, start_time, end_time, volunteers(user_id)"
+    ).eq("day_of_week", query_day).execute()
 
-    return None
+    matches = []
+    for entry in res.data:
+        # PostgreSQL TIME types are compared
+        if entry["start_time"] <= query_time < entry["end_time"]:
+            matches.append(entry["volunteers"]["user_id"])
+
+    if not matches:
+        return None
+
+    # Pick a random volunteer from available ones
+    selected_user_id = random.choice(matches)
+    
+    # Lookup profile
+    v_profile = get_supabase().table("user_profiles").select("full_name, phone").eq("user_id", selected_user_id).execute()
+    
+    if v_profile.data:
+        return {
+            "name": v_profile.data[0]["full_name"],
+            "phone": v_profile.data[0].get("phone", "+65 9123 4567")
+        }
+
+    return {
+        "name": f"Volunteer ({selected_user_id[:8]})",
+        "phone": "+65 9123 4567"
+    }
+
+def get_schedule_grouped_by_day() -> dict:
+    """Return the full schedule grouped by day in weekly order from Supabase."""
+    DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    res = get_supabase().table("volunteer_schedules").select("*").execute()
+    
+    grouped = {day: [] for day in DAYS_ORDER}
+    for entry in res.data:
+        day = entry["day_of_week"]
+        if day in grouped:
+            grouped[day].append(entry)
+    
+    for day in grouped:
+        grouped[day].sort(key=lambda x: x["start_time"])
+    return grouped

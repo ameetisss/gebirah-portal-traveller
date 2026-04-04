@@ -1,12 +1,41 @@
 import os
 import csv
 from typing import Optional, Dict, List
+from database import get_supabase
 
 def get_flight_details(flight_number: str, search_date: str) -> List[Dict[str, str]]:
     """
-    Scans the 'data' directory for CSV files and looks for matching 
-    flight numbers and search dates. Returns a list of flight details.
+    Looks for matching flight numbers and search dates in Supabase,
+    falling back to CSV scanning if no database results are found.
     """
+    results = []
+    
+    # 1. Try Supabase first (Faster/Robust)
+    try:
+        supabase = get_supabase()
+        # Clean the input for comparison just in case
+        clean_flight = "".join(flight_number.split()).upper()
+        
+        # We search by search_date and flight_number
+        # Note: In Supabase, the column might be slightly different or need exact matches
+        # We'll try to find the flight. Since we use 'UB 2' pattern, let's try direct matches.
+        res = supabase.table("flights").select("*").eq("search_date", search_date).execute()
+        
+        if res.data:
+            for row in res.data:
+                db_flight = "".join(row.get("flight_number", "").split()).upper()
+                if db_flight == clean_flight:
+                    results.append({
+                        "departure_time": row.get("departure_time", "").strip(),
+                        "arrival_airport": row.get("arrival_airport", "").strip(),
+                        "destination_country": row.get("destination_country", "").strip()
+                    })
+            if results:
+                return results
+    except Exception as e:
+        print(f"Supabase flight lookup error: {e}")
+
+    # 2. Fallback to CSV scanning
     data_dir = "data"
     results = []
     

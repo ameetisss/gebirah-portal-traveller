@@ -32,17 +32,16 @@ export default function Login() {
     setError("");
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (method === "email") {
-      if (!email || !password) { setError("Please enter your email and password."); return; }
+      if (!email) { setError("Please enter your email."); return; }
     } else {
-      if (!phone || !password) { setError("Please enter your phone number and password."); return; }
+      if (!phone) { setError("Please enter your phone number."); return; }
       if (!/^\+?[\d\s\-]{7,15}$/.test(phone)) { setError("Please enter a valid phone number."); return; }
     }
-    if (password.length < 6) { setError("Incorrect credentials."); return; }
     setError("");
-    login(method === "email" ? email : phone, method, role);
+    await login(method === "email" ? email : phone, method, role);
     navigate(role === "requester" ? "/requester" : "/dashboard");
   }
 
@@ -190,20 +189,20 @@ export default function Login() {
             )}
           </div>
 
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <label style={{
-                fontSize: "11px", color: theme.textTertiary,
-                textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600",
-              }}>Password</label>
-              <span style={{ fontSize: "12px", color: theme.accent, cursor: "pointer" }}>Forgot password?</span>
+            <div style={{ display: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label style={{
+                  fontSize: "11px", color: theme.textTertiary,
+                  textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600",
+                }}>Password</label>
+                <span style={{ fontSize: "12px", color: theme.accent, cursor: "pointer" }}>Forgot password?</span>
+              </div>
+              <input
+                type="password" placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)}
+                style={inputStyle}
+              />
             </div>
-            <input
-              type="password" placeholder="••••••••"
-              value={password} onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
 
           {error && (
             <div style={{
