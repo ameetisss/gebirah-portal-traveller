@@ -50,14 +50,31 @@ python -m venv venv
 ```bash
 pip install -r requirements.txt
 ```
-4. Configure your API key:
-   - Open `backend/.env`
-   - Replace `YOUR_SERPAPI_KEY_HERE` with your actual SerpApi key.
+4. Configure your environment variables:
+   - Copy `backend/.env.example` to `backend/.env`.
+   - Update `SUPABASE_URL`, `SUPABASE_KEY` (anon/public), and `SUPABASE_SERVICE_ROLE_KEY`.
+   SUPABASE_URL="https://mmlvcxpzrngbelyqeaze.supabase.co"
+SUPABASE_KEY="sb_publishable_8ODc0TkYTOAWVrhHx-vC1Q_Pervd_gY"
+   - Update `SERPAPI_KEY` with your actual SerpApi key.
 
-5. Run the development server:
-```bash
-uvicorn main:app --reload
-```
+5. Seed the database (Optional):
+   - Run the seed script to populate catalogue items and initial volunteers:
+   ```bash
+   python seed.py
+   ```
+
+6. Run the development server:
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+### Supabase Integration
+This portal relies on Supabase for data persistence and user management.
+- **`SUPABASE_URL`**: Your Supabase project URL.
+- **`SUPABASE_KEY`**: Your Supabase `anon` public key.
+- **`SUPABASE_SERVICE_ROLE_KEY`**: Your Supabase `service_role` key (used for administrative tasks in `seed.py`).
+
+The backend handles the connection via `backend/database.py` and provides proxy endpoints for the frontend.
 
 ### Available Endpoints
 - `GET /`: Root check.
