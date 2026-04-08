@@ -50,8 +50,10 @@ export const requesterStepTemplates = {
 export const placeholderRequesterRequests = [
   {
     id: 1,
+    requesterName: "Aisha M.",
     title: "Item placeholder",
     weightKg: 0.5,
+    urgency: "High",
     destination: "Destination placeholder",
     submittedLabel: "Submitted date placeholder",
     statusKey: "inTransit",
@@ -65,8 +67,10 @@ export const placeholderRequesterRequests = [
   },
   {
     id: 2,
+    requesterName: "Fatima K.",
     title: "Second item placeholder",
     weightKg: 2.0,
+    urgency: "Medium",
     destination: "Destination placeholder",
     submittedLabel: "Submitted date placeholder",
     statusKey: "waiting",
@@ -125,11 +129,13 @@ export function formatRequesterArrival(arrival) {
   return arrival.message;
 }
 
-export function createPlaceholderRequesterRequest(form) {
+export function createPlaceholderRequesterRequest(form, requesterName = "Requester") {
   return {
     id: Date.now(),
+    requesterName,
     title: form.description,
     weightKg: Number(form.weight),
+    urgency: form.urgency,
     destination: form.destination,
     submittedLabel: "Submitted just now",
     statusKey: "waiting",
@@ -145,4 +151,3 @@ export function createPlaceholderRequesterRequest(form) {
         },
   };
 }
-

@@ -3,12 +3,18 @@ import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import TripDetailModal from "../components/TripDetailModal";
 import { theme } from "../theme";
+import { useAuth } from "../context/AuthContext";
 import { useTrip } from "../context/TripContext";
 import { staticHistory } from "../data/historyData";
+import { getTravellerLevelProgress } from "../data/badgeData";
 
 export default function History() {
+  const { userName } = useAuth();
   const { completedTrips } = useTrip();
   const allTrips = [...completedTrips, ...staticHistory];
+  const travellerStats = allTrips.filter((trip) => trip.travellerName === userName)
+    .reduce((accumulator, trip) => ({ totalTrips: accumulator.totalTrips + 1, totalKg: accumulator.totalKg + Number(trip.kg ?? 0) }), { totalTrips: 0, totalKg: 0 });
+  const travellerLevel = getTravellerLevelProgress(travellerStats.totalKg);
   const [selectedTrip, setSelectedTrip] = useState(null);
   return (
     <div style={{
@@ -16,7 +22,7 @@ export default function History() {
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif", fontSize: "14px", lineHeight: "1.5",
     }}>
       {selectedTrip && <TripDetailModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} />}
-      <Topbar />
+      <Topbar travellerProgress={travellerLevel} />
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
         <div style={{ maxWidth: "560px" }}>

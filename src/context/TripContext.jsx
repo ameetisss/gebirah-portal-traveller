@@ -48,6 +48,10 @@ export const DEMO_HANDOVER = {
 
 const TripContext = createContext();
 
+function getExistingCompletedId(tripId, completedTrips) {
+  return completedTrips.find((trip) => trip.sourceTripId === tripId)?.id ?? null;
+}
+
 export function TripProvider({ children }) {
   const [trips, setTrips]               = useState([]);
   const [activeTripId, setActiveTripId] = useState(null);
@@ -69,8 +73,21 @@ export function TripProvider({ children }) {
   // Add a new trip (replaces setTripData + setStage(AWAITING))
   function addTrip(formData) {
     const id = Date.now();
-    setTrips(prev => [...prev, { id, ...formData, stage: STAGES.AWAITING }]);
+    setTrips(prev => [...prev, {
+      id,
+      travellerName: formData.travellerName ?? "Traveller",
+      pickupProof: null,
+      deliveryProof: null,
+      ...formData,
+      stage: STAGES.AWAITING,
+    }]);
     setActiveTripId(id);
+  }
+
+  function updateTrip(tripId, patch) {
+    setTrips((prev) => prev.map((trip) => (
+      trip.id === tripId ? { ...trip, ...patch } : trip
+    )));
   }
 
   // Update the active trip's stage
@@ -85,20 +102,35 @@ export function TripProvider({ children }) {
   }
 
   // Save active trip to history (called before setting COMPLETED stage)
-  function completeTrip() {
-    if (!activeTrip) return;
-    setCompletedTrips(prev => [{
-      id: Date.now(),
-      route: `SG \u2192 ${activeTrip.destination}`,
-      date: activeTrip.date,
-      flight: activeTrip.flight,
-      destination: activeTrip.destination,
-      items: DEMO_HANDOVER.items.length,
-      kg: DEMO_HANDOVER.totalWeight,
-      itemsList: DEMO_HANDOVER.items,
-      departureVolunteer: DEMO_HANDOVER.volunteer,
-      arrivalVolunteer:   DEMO_ARRIVAL.volunteer,
-    }, ...prev]);
+  function completeTrip(tripId = activeTrip?.id, extras = {}) {
+    const targetTrip = trips.find((trip) => trip.id === tripId);
+    if (!targetTrip) return;
+
+    const completedRecord = {
+      id: getExistingCompletedId(targetTrip.id, completedTrips) ?? Date.now(),
+      sourceTripId: targetTrip.id,
+      route: `SG \u2192 ${targetTrip.destination}`,
+      date: targetTrip.date,
+      flight: targetTrip.flight,
+      travellerName: targetTrip.travellerName,
+      destination: targetTrip.destination,
+      items: extras.itemsCount ?? DEMO_HANDOVER.items.length,
+      kg: extras.totalWeight ?? DEMO_HANDOVER.totalWeight,
+      itemsList: extras.itemsList ?? DEMO_HANDOVER.items,
+      departureVolunteer: extras.departureVolunteer ?? DEMO_HANDOVER.volunteer,
+      arrivalVolunteer: extras.arrivalVolunteer ?? DEMO_ARRIVAL.volunteer,
+      pickupProof: extras.pickupProof ?? targetTrip.pickupProof ?? null,
+      deliveryProof: extras.deliveryProof ?? targetTrip.deliveryProof ?? null,
+    };
+
+    setCompletedTrips((prev) => {
+      const existingIndex = prev.findIndex((trip) => trip.sourceTripId === targetTrip.id);
+      if (existingIndex === -1) return [completedRecord, ...prev];
+
+      const next = [...prev];
+      next[existingIndex] = { ...next[existingIndex], ...completedRecord };
+      return next;
+    });
   }
 
   // Remove the active trip and select the next one
@@ -113,6 +145,7 @@ export function TripProvider({ children }) {
     <TripContext.Provider value={{
       // Multi-trip
       trips, activeTripId, setActiveTripId, addTrip,
+      updateTrip,
       setStageForTrip,
       // Backward-compat single-trip API
       tripData, stage, setStage,

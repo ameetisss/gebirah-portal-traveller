@@ -3,11 +3,13 @@ import { useLocation } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
+import { useRequests } from "../context/RequestContext";
+import { useAuth } from "../context/AuthContext";
+import { useTrip, STAGES } from "../context/TripContext";
+import { getRequestQueue } from "../data/gebirahData";
 import {
-  createPlaceholderRequesterRequest,
   formatRequesterArrival,
   formatRequesterMeta,
-  placeholderRequesterRequests,
   requesterFormDefaults,
   requesterNavItems,
   requesterStatusMap,
@@ -62,8 +64,18 @@ function RequestStepper({ steps }) {
   );
 }
 
-function RequestCard({ request }) {
+function RequestCard({ request, linkedTrip, onConfirmReceipt }) {
   const status = requesterStatusMap[request.statusKey];
+  const [proof, setProof] = useState(null);
+
+  function handleProofSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProof({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    });
+  }
 
   return (
     <Card style={{ background: "#F8F4ED", border: "1px solid #E7DED0", borderRadius: "20px" }}>
@@ -94,6 +106,32 @@ function RequestCard({ request }) {
         >
           {formatRequesterArrival(request.arrival)}
         </div>
+
+        {request.statusKey === "inTransit" && (
+          <div style={{ marginTop: "18px", padding: "18px 20px", borderRadius: "16px", background: "#FFF9F0", border: "1px solid #E3D8C7" }}>
+            <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "6px" }}>Confirm receipt from traveller</div>
+            <div style={{ fontSize: "14px", color: "#776F63", lineHeight: "1.55", marginBottom: "12px" }}>
+              Add an optional handover image to confirm the final receipt. {linkedTrip ? `Linked traveller: ${linkedTrip.travellerName} · ${linkedTrip.flight}` : ""}
+            </div>
+            <label style={{ ...btn("ghost"), display: "inline-flex", alignItems: "center", borderRadius: "12px", background: "#FFFFFF" }}>
+              Attach image
+              <input type="file" accept="image/*" onChange={handleProofSelect} style={{ display: "none" }} />
+            </label>
+            {proof && (
+              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <img src={proof.url} alt="Receipt proof" style={{ width: "72px", height: "72px", objectFit: "cover", borderRadius: "10px", border: "1px solid #D9CFBF" }} />
+                <div style={{ fontSize: "12px", color: "#776F63" }}>{proof.name}</div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onConfirmReceipt(request, linkedTrip, proof)}
+              style={{ ...btn("primary"), marginTop: "14px", width: "100%", borderRadius: "12px", padding: "12px 16px" }}
+            >
+              Confirm final receipt
+            </button>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -102,7 +140,9 @@ function RequestCard({ request }) {
 export default function RequesterPortal() {
   const location = useLocation();
   const newRequestRef = useRef(null);
-  const [requests, setRequests] = useState(placeholderRequesterRequests);
+  const { userName } = useAuth();
+  const { requests, addRequest, updateRequest } = useRequests();
+  const { trips, setStageForTrip, completeTrip, updateTrip } = useTrip();
   const [form, setForm] = useState(requesterFormDefaults);
 
   useEffect(() => {
@@ -119,11 +159,39 @@ export default function RequesterPortal() {
     event.preventDefault();
     if (!form.description || !form.weight || !form.destination) return;
 
-    setRequests((current) => [createPlaceholderRequesterRequest(form), ...current]);
+    addRequest(form, userName);
     setForm(requesterFormDefaults);
   }
 
   const isValid = form.description && form.weight && form.destination;
+  const activeRequests = requests.filter((request) => request.statusKey !== "delivered");
+  const requestQueue = getRequestQueue(requests, trips);
+  const linkedTripsByRequest = new Map(requestQueue.map((item) => [item.id, item.linkedTrip]));
+
+  function handleConfirmReceipt(request, linkedTrip, proof) {
+    const deliveredLabel = "Received just now";
+    const routeLabel = linkedTrip
+      ? `${linkedTrip.travellerName} · ${linkedTrip.flight} to ${linkedTrip.destination}`
+      : "Traveller handover confirmed";
+
+    updateRequest(request.id, {
+      statusKey: "delivered",
+      deliveredLabel,
+      routeLabel,
+      deliveryProof: proof,
+    });
+
+    if (linkedTrip) {
+      updateTrip(linkedTrip.id, { deliveryProof: proof });
+      completeTrip(linkedTrip.id, {
+        deliveryProof: proof,
+        totalWeight: request.weightKg,
+        itemsCount: 1,
+        itemsList: [{ name: request.title, weight: request.weightKg, requester: request.requesterName }],
+      });
+      setStageForTrip(linkedTrip.id, STAGES.COMPLETED);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#FFFFFF", color: theme.textPrimary, fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif" }}>
@@ -163,8 +231,13 @@ export default function RequesterPortal() {
               </a>
             </div>
 
-            {requests.map((request) => (
-              <RequestCard key={request.id} request={request} />
+            {activeRequests.map((request) => (
+              <RequestCard
+                key={request.id}
+                request={request}
+                linkedTrip={linkedTripsByRequest.get(request.id)}
+                onConfirmReceipt={handleConfirmReceipt}
+              />
             ))}
           </section>
 

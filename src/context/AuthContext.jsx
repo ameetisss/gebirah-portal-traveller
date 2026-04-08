@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
       const raw = identifier.split("@")[0];
       setUserName(raw.charAt(0).toUpperCase() + raw.slice(1));
     } else {
-      setUserName(role === "requester" ? "Requester" : "Traveller");
+      setUserName(role === "requester" ? "Requester" : role === "gebirah" ? "Gebirah" : role === "volunteer" ? "Volunteer" : "Traveller");
     }
     setUserRole(role);
     setIsLoggedIn(true);

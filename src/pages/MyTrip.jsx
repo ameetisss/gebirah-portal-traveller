@@ -5,6 +5,12 @@ import ConfirmModal from "../components/ConfirmModal";
 import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
 import { useTrip, STAGES, DEMO_MATCH, DEMO_ARRIVAL, DEMO_HANDOVER } from "../context/TripContext";
+import { useAuth } from "../context/AuthContext";
+import { useVolunteers } from "../context/VolunteerContext";
+import { useRequests } from "../context/RequestContext";
+import { getTripLinkedAssignment } from "../data/volunteerData";
+import { getTravellerLevelProgress } from "../data/badgeData";
+import { staticHistory } from "../data/historyData";
 
 const STAGE_ORDER = [STAGES.AWAITING, STAGES.MATCH, STAGES.HANDOVER, STAGES.DEPARTED, STAGES.ARRIVAL, STAGES.COMPLETED];
 
@@ -291,7 +297,17 @@ function DepartedView({ trip, handover, arrival, onLanded }) {
 
 function ArrivalView({ trip, arrival, onConfirm }) {
   const [checked, setChecked] = useState(Object.fromEntries(arrival.items.map((_, i) => [i, false])));
+  const [proof, setProof] = useState(null);
   const allChecked = Object.values(checked).every(Boolean);
+
+  function handleProofSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProof({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    });
+  }
 
   return (
     <div style={{ maxWidth: "560px", margin: "0 auto" }}>
@@ -355,10 +371,29 @@ function ArrivalView({ trip, arrival, onConfirm }) {
         </div>
       </Card>
 
+      <Card style={{ marginBottom: "20px" }}>
+        <CardHeader title="Confirmation image" />
+        <div style={{ padding: "18px 20px" }}>
+          <div style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: "1.6", marginBottom: "12px" }}>
+            Attach an optional image of the final handover for the receiving contact.
+          </div>
+          <label style={{ ...btn("ghost"), display: "inline-flex", alignItems: "center" }}>
+            Attach image
+            <input type="file" accept="image/*" onChange={handleProofSelect} style={{ display: "none" }} />
+          </label>
+          {proof && (
+            <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "12px" }}>
+              <img src={proof.url} alt="Delivery proof" style={{ width: "72px", height: "72px", objectFit: "cover", borderRadius: "10px", border: `1px solid ${theme.border}` }} />
+              <div style={{ fontSize: "12px", color: theme.textSecondary }}>{proof.name}</div>
+            </div>
+          )}
+        </div>
+      </Card>
+
       <button
         style={{ ...btn("primary"), width: "100%", padding: "12px", fontSize: "14px", opacity: allChecked ? 1 : 0.4 }}
         disabled={!allChecked}
-        onClick={onConfirm}
+        onClick={() => onConfirm(proof)}
       >
         Confirm handover — request complete
       </button>
@@ -416,8 +451,11 @@ const STAGE_LABEL = {
 
 export default function MyTrip() {
   const navigate = useNavigate();
+  const { userName } = useAuth();
+  const { assignments, completeAssignment } = useVolunteers();
+  const { updateRequestStatus } = useRequests();
   const { trips, activeTripId, setActiveTripId, addTrip,
-          stage, setStage, tripData, activeHandover, resetTrip, completeTrip } = useTrip();
+          stage, setStage, tripData, activeHandover, resetTrip, completeTrip, updateTrip, completedTrips } = useTrip();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
 
@@ -428,6 +466,25 @@ export default function MyTrip() {
     resetTrip();
   }
 
+  const linkedAssignment = getTripLinkedAssignment(tripData, assignments);
+  const travellerStats = [...completedTrips, ...staticHistory].filter((trip) => trip.travellerName === userName)
+    .reduce((accumulator, trip) => ({ totalTrips: accumulator.totalTrips + 1, totalKg: accumulator.totalKg + Number(trip.kg ?? 0) }), { totalTrips: 0, totalKg: 0 });
+  const travellerLevel = getTravellerLevelProgress(travellerStats.totalKg);
+  const displayHandover = linkedAssignment ? {
+    ...activeHandover,
+    time: linkedAssignment.time,
+    location: linkedAssignment.location,
+    volunteer: linkedAssignment.volunteerName,
+    volunteerPhone: linkedAssignment.volunteerPhone,
+    totalWeight: linkedAssignment.weightKg,
+    items: [{
+      name: linkedAssignment.item,
+      description: `For ${linkedAssignment.requesterName}`,
+      weight: linkedAssignment.weightKg,
+      requester: linkedAssignment.requesterName,
+    }],
+  } : activeHandover;
+
   return (
     <div style={{
       minHeight: "100vh", background: theme.bg, color: theme.textPrimary,
@@ -435,12 +492,21 @@ export default function MyTrip() {
     }}>
       {showConfirm && (
         <ConfirmModal
-          items={activeHandover.items}
-          onClose={() => { setShowConfirm(false); setStage(STAGES.DEPARTED); }}
+          items={displayHandover.items}
+          onClose={() => { setShowConfirm(false); }}
+          onConfirm={(proof) => {
+            if (tripData) updateTrip(tripData.id, { pickupProof: proof });
+            if (linkedAssignment) {
+              completeAssignment(linkedAssignment.id);
+              if (linkedAssignment.requestId) updateRequestStatus(linkedAssignment.requestId, "inTransit");
+            }
+            setShowConfirm(false);
+            setStage(STAGES.DEPARTED);
+          }}
         />
       )}
 
-      <Topbar />
+      <Topbar travellerProgress={travellerLevel} />
 
       {/* Trip tab strip */}
       {trips.length > 0 && (
@@ -527,7 +593,7 @@ export default function MyTrip() {
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
         {displayRegister && (
-          <RegisterView onSubmit={form => { addTrip(form); setShowRegister(false); }} />
+          <RegisterView onSubmit={form => { addTrip({ ...form, travellerName: userName }); setShowRegister(false); }} />
         )}
         {!displayRegister && stage === STAGES.AWAITING && (
           <AwaitingView trip={tripData} onMatchFound={() => setStage(STAGES.MATCH)} />
@@ -543,7 +609,7 @@ export default function MyTrip() {
         {!displayRegister && stage === STAGES.HANDOVER && (
           <HandoverView
             trip={tripData}
-            handover={activeHandover}
+            handover={displayHandover}
             onConfirm={() => setShowConfirm(true)}
             onViewTrips={() => navigate("/history")}
           />
@@ -551,7 +617,7 @@ export default function MyTrip() {
         {!displayRegister && stage === STAGES.DEPARTED && (
           <DepartedView
             trip={tripData}
-            handover={activeHandover}
+            handover={displayHandover}
             arrival={DEMO_ARRIVAL}
             onLanded={() => setStage(STAGES.ARRIVAL)}
           />
@@ -560,11 +626,15 @@ export default function MyTrip() {
           <ArrivalView
             trip={tripData}
             arrival={DEMO_ARRIVAL}
-            onConfirm={() => { completeTrip(); setStage(STAGES.COMPLETED); }}
+            onConfirm={(proof) => {
+              if (tripData) updateTrip(tripData.id, { deliveryProof: proof });
+              completeTrip(tripData?.id, { deliveryProof: proof });
+              setStage(STAGES.COMPLETED);
+            }}
           />
         )}
         {!displayRegister && stage === STAGES.COMPLETED && (
-          <CompletedView trip={tripData} handover={activeHandover} onReset={handleReset} />
+          <CompletedView trip={tripData} handover={displayHandover} onReset={handleReset} />
         )}
       </div>
     </div>

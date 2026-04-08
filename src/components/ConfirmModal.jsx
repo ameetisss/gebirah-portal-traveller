@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { theme, btn } from "../theme";
 
-export default function ConfirmModal({ items, onClose }) {
+export default function ConfirmModal({ items, onClose, onConfirm }) {
   const [step, setStep] = useState(0);
   const [checked, setChecked] = useState(Object.fromEntries(items.map((_, i) => [i, false])));
+  const [proof, setProof] = useState(null);
   const allChecked = Object.values(checked).every(Boolean);
   const totalKg = items.reduce((s, i) => s + i.weight, 0).toFixed(1);
+
+  function handleProofSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProof({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    });
+  }
 
   return (
     <div style={{
@@ -60,6 +70,21 @@ export default function ConfirmModal({ items, onClose }) {
                 </div>
               </div>
             ))}
+            <div style={{ marginTop: "14px", padding: "12px", borderRadius: "10px", background: theme.surface, border: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "8px" }}>
+                Optional handover photo
+              </div>
+              <label style={{ ...btn("ghost"), display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+                Attach image
+                <input type="file" accept="image/*" onChange={handleProofSelect} style={{ display: "none" }} />
+              </label>
+              {proof && (
+                <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                  <img src={proof.url} alt="Handover proof" style={{ width: "68px", height: "68px", objectFit: "cover", borderRadius: "8px", border: `1px solid ${theme.border}` }} />
+                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{proof.name}</div>
+                </div>
+              )}
+            </div>
             <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
               <button style={{ ...btn("ghost"), flex: 1 }} onClick={onClose}>Cancel</button>
               <button
@@ -86,7 +111,7 @@ export default function ConfirmModal({ items, onClose }) {
             <div style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "20px", lineHeight: "1.6" }}>
               {totalKg} kg confirmed · Gebirah notified · Volunteer assignment closed
             </div>
-            <button style={{ ...btn("success"), width: "100%" }} onClick={onClose}>Done</button>
+            <button style={{ ...btn("success"), width: "100%" }} onClick={() => (onConfirm ? onConfirm(proof) : onClose())}>Done</button>
           </div>
         )}
       </div>
