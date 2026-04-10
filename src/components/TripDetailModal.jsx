@@ -131,6 +131,28 @@ export default function TripDetailModal({ trip, onClose }) {
           </div>
         )}
 
+        {(trip.pickupProof || trip.deliveryProof) && (
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "11px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600", marginBottom: "8px" }}>
+              Handover proofs
+            </div>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              {trip.pickupProof && (
+                <div>
+                  <div style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px" }}>Volunteer to traveller</div>
+                  <img src={trip.pickupProof.url} alt="Pickup proof" style={{ width: "120px", height: "120px", objectFit: "cover", borderRadius: "12px", border: `1px solid ${theme.border}` }} />
+                </div>
+              )}
+              {trip.deliveryProof && (
+                <div>
+                  <div style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px" }}>Final delivery</div>
+                  <img src={trip.deliveryProof.url} alt="Delivery proof" style={{ width: "120px", height: "120px", objectFit: "cover", borderRadius: "12px", border: `1px solid ${theme.border}` }} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <button style={{ ...btn("ghost"), width: "100%" }} onClick={onClose}>Close</button>
       </div>
     </div>

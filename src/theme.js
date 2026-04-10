@@ -1,9 +1,9 @@
 export const theme = {
   bg: "#ffffff",
-  surface: "#f5f5f5",
-  surfaceHover: "#ebebeb",
-  border: "#e0e0e0",
-  borderLight: "#cccccc",
+  surface: "#F8F7F4",
+  surfaceHover: "#F1EFEA",
+  border: "#E5E0D7",
+  borderLight: "#D7D0C4",
   accent: "#7C6EF8",
   accentLight: "#9d92f9",
   accentDim: "#7C6EF820",
@@ -22,28 +22,37 @@ export const theme = {
 
 export function btn(variant = "default") {
   return {
-    padding: "9px 18px",
-    borderRadius: "8px",
+    padding: "10px 18px",
+    borderRadius: "10px",
     fontSize: "13px",
-    fontWeight: "500",
+    fontWeight: "600",
     cursor: "pointer",
     border: "none",
     fontFamily: "inherit",
-    transition: "opacity 0.15s",
-    ...(variant === "primary" && { background: theme.accent, color: "#fff" }),
+    transition: "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease",
+    ...(variant === "primary" && {
+      background: theme.accent,
+      color: "#fff",
+      boxShadow: "0 10px 24px rgba(124, 110, 248, 0.18)",
+    }),
     ...(variant === "ghost" && {
-      background: "transparent",
+      background: "#fff",
       color: theme.textSecondary,
       border: `1px solid ${theme.border}`,
+      boxShadow: "0 4px 14px rgba(38, 31, 22, 0.04)",
     }),
-    ...(variant === "success" && { background: theme.green, color: "#fff" }),
+    ...(variant === "success" && {
+      background: theme.green,
+      color: "#fff",
+      boxShadow: "0 10px 24px rgba(34, 197, 94, 0.16)",
+    }),
   };
 }
 
 export const inputStyle = {
   width: "100%",
-  padding: "9px 12px",
-  borderRadius: "8px",
+  padding: "10px 12px",
+  borderRadius: "10px",
   border: `1px solid ${theme.border}`,
   background: theme.bg,
   color: theme.textPrimary,
@@ -51,4 +60,5 @@ export const inputStyle = {
   fontFamily: "inherit",
   outline: "none",
   boxSizing: "border-box",
+  transition: "border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
 };

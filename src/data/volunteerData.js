@@ -1,0 +1,146 @@
+export const volunteerNavItems = [
+  {
+    path: "/volunteer",
+    label: "My assignments",
+    match: (location) => location.pathname === "/volunteer",
+  },
+  { path: "/volunteer/availability", label: "Availability" },
+  { path: "/volunteer/history", label: "History" },
+];
+
+export const initialVolunteerAssignments = [
+  {
+    id: 101,
+    requestId: 1,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Leila S.",
+    travellerName: "Priya W.",
+    flight: "QR 628",
+    item: "Baby supplies",
+    weightKg: 1.5,
+    destination: "Syria",
+    time: "14:30",
+    dateLabel: "Today",
+    location: "T3 Departure hall",
+    landmark: "L2, Bag drop area",
+    urgency: "Urgent",
+    status: "pending",
+  },
+  {
+    id: 102,
+    requestId: 2,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Fatima K.",
+    travellerName: "Ravi M.",
+    flight: "EK 354",
+    item: "Clothing",
+    weightKg: 2,
+    destination: "Jordan",
+    time: "18:00",
+    dateLabel: "Tomorrow",
+    location: "T1 Check-in level",
+    landmark: "Near check-in row G",
+    urgency: "Medium",
+    status: "pending",
+  },
+  {
+    id: 103,
+    requestId: null,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Leila S.",
+    travellerName: "Ahmed N.",
+    flight: "SQ 401",
+    item: "Winter medicine pack",
+    weightKg: 1.2,
+    destination: "Gaza",
+    time: "10:00",
+    dateLabel: "19 Mar",
+    location: "T2 Departure hall",
+    landmark: "Near door B12",
+    urgency: "Confirmed",
+    status: "confirmed",
+  },
+  {
+    id: 104,
+    requestId: null,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Leila S.",
+    travellerName: "Ahmed N.",
+    flight: "SQ 401",
+    item: "Baby supplies",
+    weightKg: 1.5,
+    destination: "Syria",
+    time: "12 Mar",
+    dateLabel: "12 Mar",
+    location: "T3 handover desk",
+    landmark: "Completed",
+    urgency: "Done",
+    status: "completed",
+  },
+  {
+    id: 105,
+    requestId: null,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Aisha M.",
+    travellerName: "Ravi M.",
+    flight: "QR 628",
+    item: "Medication",
+    weightKg: 0.5,
+    destination: "Gaza",
+    time: "5 Mar",
+    dateLabel: "5 Mar",
+    location: "T3 handover desk",
+    landmark: "Completed",
+    urgency: "Done",
+    status: "completed",
+  },
+  {
+    id: 106,
+    requestId: null,
+    tripId: null,
+    volunteerName: "Volunteer",
+    volunteerPhone: "+65 9876 5432",
+    requesterName: "Omar R.",
+    travellerName: "Sarah L.",
+    flight: "ME 231",
+    item: "Books",
+    weightKg: 1.2,
+    destination: "Lebanon",
+    time: "28 Feb",
+    dateLabel: "28 Feb",
+    location: "T1 handover desk",
+    landmark: "Completed",
+    urgency: "Done",
+    status: "completed",
+  },
+];
+
+export const defaultAvailabilityDays = [4, 5, 11, 12, 19, 20, 21, 22, 26, 27, 31];
+
+export const volunteerStatusStyles = {
+  pending: { color: "#A24A4A", bg: "#FBE7E4", label: "Urgent" },
+  confirmed: { color: "#547B30", bg: "#E8F2D8", label: "Confirmed" },
+  completed: { color: "#547B30", bg: "#E8F2D8", label: "Done" },
+  declined: { color: "#6B645A", bg: "#EDE7DD", label: "Declined" },
+};
+
+export function getTripLinkedAssignment(trip, assignments) {
+  if (!trip) return null;
+
+  return assignments.find((assignment) => (
+    assignment.status !== "declined"
+    && (assignment.tripId === trip.id
+      || trip.destination.toLowerCase().includes(assignment.destination.toLowerCase())
+      || assignment.destination.toLowerCase().includes(trip.destination.toLowerCase()))
+  )) ?? null;
+}

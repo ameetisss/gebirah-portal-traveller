@@ -4,68 +4,17 @@ import { useAuth } from "../context/AuthContext";
 import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
-
-const REQUESTER_NAV_ITEMS = [
-  {
-    path: "/requester",
-    label: "My requests",
-    match: (location) => location.pathname === "/requester" && location.hash !== "#new-request",
-  },
-  {
-    path: "/requester",
-    hash: "#new-request",
-    label: "New request",
-    match: (location) => location.pathname === "/requester" && location.hash === "#new-request",
-  },
-  { path: "/request-history", label: "History" },
-];
-
-const REQUEST_STEPS = {
-  inTransit: [
-    { label: "Request submitted", done: true },
-    { label: "Approved by coordinator", done: true },
-    { label: "Matched to traveller: Sarah L.", done: true },
-    { label: "Delivery to you pending", done: false },
-  ],
-  waiting: [
-    { label: "Request submitted", done: true },
-    { label: "Awaiting approval", done: false },
-    { label: "Awaiting traveller match", done: false },
-    { label: "Airport pickup pending", done: false },
-    { label: "Delivery to you pending", done: false },
-  ],
-};
-
-const INITIAL_REQUESTS = [
-  {
-    id: 1,
-    title: "Medication",
-    meta: "0.5 kg · Gaza · Submitted 10 Mar",
-    status: "In transit",
-    statusColor: "#3C7F2E",
-    statusBg: "#E5F3D9",
-    steps: REQUEST_STEPS.inTransit,
-    arrival: "Expected arrival: 15 Mar · SQ 417 via Amman",
-  },
-  {
-    id: 2,
-    title: "Clothing",
-    meta: "2 kg · Gaza · Submitted 8 Mar",
-    status: "Waiting",
-    statusColor: "#8A5A16",
-    statusBg: "#F8EBD3",
-    steps: REQUEST_STEPS.waiting,
-    arrival: "Coordinator is sourcing a traveller match",
-  },
-];
-
-const EMPTY_FORM = {
-  description: "",
-  weight: "",
-  urgency: "High",
-  destination: "",
-  reason: "",
-};
+import { useRequests } from "../context/RequestContext";
+import { useAuth } from "../context/AuthContext";
+import { useTrip, STAGES } from "../context/TripContext";
+import { getRequestQueue } from "../data/gebirahData";
+import {
+  formatRequesterArrival,
+  formatRequesterMeta,
+  requesterFormDefaults,
+  requesterNavItems,
+  requesterStatusMap,
+} from "../data/requesterData";
 
 function RequestStepper({ steps }) {
   return (
@@ -116,7 +65,19 @@ function RequestStepper({ steps }) {
   );
 }
 
-function RequestCard({ request }) {
+function RequestCard({ request, linkedTrip, onConfirmReceipt }) {
+  const status = requesterStatusMap[request.statusKey];
+  const [proof, setProof] = useState(null);
+
+  function handleProofSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProof({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    });
+  }
+
   return (
     <Card style={{ background: "#F8F4ED", border: "1px solid #E7DED0", borderRadius: "20px" }}>
       <div style={{ padding: "28px" }}>
@@ -125,9 +86,9 @@ function RequestCard({ request }) {
             <div style={{ fontSize: "19px", fontWeight: "600", letterSpacing: "-0.03em", color: theme.textPrimary, marginBottom: "4px" }}>
               {request.title}
             </div>
-            <div style={{ fontSize: "14px", color: "#776F63" }}>{request.meta}</div>
+            <div style={{ fontSize: "14px", color: "#776F63" }}>{formatRequesterMeta(request)}</div>
           </div>
-          <Badge color={request.statusColor} bg={request.statusBg}>{request.status}</Badge>
+          <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
         </div>
 
         <RequestStepper steps={request.steps} />
@@ -144,25 +105,50 @@ function RequestCard({ request }) {
             border: "1px solid #E3D8C7",
           }}
         >
-          {request.arrival}
+          {formatRequesterArrival(request.arrival)}
         </div>
+
+        {request.statusKey === "inTransit" && (
+          <div style={{ marginTop: "18px", padding: "18px 20px", borderRadius: "16px", background: "#FFF9F0", border: "1px solid #E3D8C7" }}>
+            <div style={{ fontSize: "15px", fontWeight: "600", color: theme.textPrimary, marginBottom: "6px" }}>Confirm receipt from traveller</div>
+            <div style={{ fontSize: "14px", color: "#776F63", lineHeight: "1.55", marginBottom: "12px" }}>
+              Add an optional handover image to confirm the final receipt. {linkedTrip ? `Linked traveller: ${linkedTrip.travellerName} · ${linkedTrip.flight}` : ""}
+            </div>
+            <label style={{ ...btn("ghost"), display: "inline-flex", alignItems: "center", borderRadius: "12px", background: "#FFFFFF" }}>
+              Attach image
+              <input type="file" accept="image/*" onChange={handleProofSelect} style={{ display: "none" }} />
+            </label>
+            {proof && (
+              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <img src={proof.url} alt="Receipt proof" style={{ width: "72px", height: "72px", objectFit: "cover", borderRadius: "10px", border: "1px solid #D9CFBF" }} />
+                <div style={{ fontSize: "12px", color: "#776F63" }}>{proof.name}</div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onConfirmReceipt(request, linkedTrip, proof)}
+              style={{ ...btn("primary"), marginTop: "14px", width: "100%", borderRadius: "12px", padding: "12px 16px" }}
+            >
+              Confirm final receipt
+            </button>
+          </div>
+        )}
       </div>
     </Card>
   );
 }
 
-export default function RequesterPortal() {
-  const location = useLocation();
-  const { userId } = useAuth();
-  const newRequestRef = useRef(null);
-  const [requests, setRequests] = useState([]);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const { userName, userId } = useAuth();
+  const { requests, addRequest, updateRequest } = useRequests();
+  const { trips, setStageForTrip, completeTrip, updateTrip } = useTrip();
+  const [backendRequests, setBackendRequests] = useState([]);
+  const [form, setForm] = useState(requesterFormDefaults);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [userId]);
 
   async function fetchRequests() {
     try {
@@ -173,14 +159,21 @@ export default function RequesterPortal() {
         const mapped = result.data.map(req => ({
           id: req.id,
           title: req.description,
-          meta: `${req.weight_kg} kg · ${req.destination} · Submitted ${new Date(req.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
-          status: req.status,
-          statusColor: req.status === "In transit" ? "#3C7F2E" : "#8A5A16",
-          statusBg: req.status === "In transit" ? "#E5F3D9" : "#F8EBD3",
-          steps: req.status === "In transit" ? REQUEST_STEPS.inTransit : REQUEST_STEPS.waiting,
+          weightKg: req.weight_kg,
+          destination: req.destination,
+          statusKey: req.status === "In transit" ? "inTransit" : "submitted",
           arrival: req.arrival_info || (req.reason ? `Reason: ${req.reason}` : "Coordinator is sourcing a traveller match"),
+          steps: req.status === "In transit" ? [
+            { label: "Request submitted", done: true },
+            { label: "Matched with traveller", done: true },
+            { label: "Handover in transit", done: true },
+            { label: "Final delivery", done: false },
+          ] : [
+            { label: "Request submitted", done: true },
+            { label: "Matching traveller...", done: false },
+          ],
         }));
-        setRequests(mapped);
+        setBackendRequests(mapped);
       }
     } catch (e) {
       console.error("Fetch requests error:", e);
@@ -209,15 +202,19 @@ export default function RequesterPortal() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          description: form.description,
+          weight_kg: form.weight,
+          destination: form.destination,
+          urgency: form.urgency,
+          reason: form.reason,
           user_id: userId
         })
       });
       const result = await res.json();
       if (result.status === "success") {
-        setForm(EMPTY_FORM);
+        addRequest(form, userName);
+        setForm(requesterFormDefaults);
         fetchRequests();
-        // Scroll to top to see the new request
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (e) {
@@ -228,11 +225,39 @@ export default function RequesterPortal() {
   }
 
   const isValid = form.description && form.weight && form.destination;
+  const activeRequests = requests.filter((request) => request.statusKey !== "delivered");
+  const requestQueue = getRequestQueue(requests, trips);
+  const linkedTripsByRequest = new Map(requestQueue.map((item) => [item.id, item.linkedTrip]));
+
+  function handleConfirmReceipt(request, linkedTrip, proof) {
+    const deliveredLabel = "Received just now";
+    const routeLabel = linkedTrip
+      ? `${linkedTrip.travellerName} · ${linkedTrip.flight} to ${linkedTrip.destination}`
+      : "Traveller handover confirmed";
+
+    updateRequest(request.id, {
+      statusKey: "delivered",
+      deliveredLabel,
+      routeLabel,
+      deliveryProof: proof,
+    });
+
+    if (linkedTrip) {
+      updateTrip(linkedTrip.id, { deliveryProof: proof });
+      completeTrip(linkedTrip.id, {
+        deliveryProof: proof,
+        totalWeight: request.weightKg,
+        itemsCount: 1,
+        itemsList: [{ name: request.title, weight: request.weightKg, requester: request.requesterName }],
+      });
+      setStageForTrip(linkedTrip.id, STAGES.COMPLETED);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#FFFFFF", color: theme.textPrimary, fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif" }}>
       <Topbar
-        navItems={REQUESTER_NAV_ITEMS}
+        navItems={requesterNavItems}
         homePath="/requester"
         brandLabel="Gebirah portal"
         logoBg="#ECE8FF"
@@ -269,15 +294,20 @@ export default function RequesterPortal() {
 
             {isLoading ? (
               <div style={{ padding: "40px", textAlign: "center", color: theme.textTertiary }}>Loading your requests...</div>
-            ) : requests.length === 0 ? (
+            ) : (activeRequests.length === 0 && backendRequests.length === 0) ? (
               <div style={{ padding: "60px 40px", textAlign: "center", background: "#F8F4ED", borderRadius: "20px", border: "1px dashed #D9CFBF" }}>
                 <div style={{ fontSize: "32px", marginBottom: "16px" }}>📦</div>
                 <div style={{ fontSize: "16px", fontWeight: "600", color: theme.textPrimary, marginBottom: "8px" }}>No active requests</div>
                 <div style={{ fontSize: "14px", color: theme.textSecondary }}>Your submitted requests will appear here once you add them.</div>
               </div>
             ) : (
-              requests.map((request) => (
-                <RequestCard key={request.id} request={request} />
+              [...activeRequests, ...backendRequests].map((request) => (
+                <RequestCard 
+                  key={request.id} 
+                  request={request} 
+                  linkedTrip={linkedTripsByRequest.get(request.id)}
+                  onConfirmReceipt={handleConfirmReceipt}
+                />
               ))
             )}
           </section>

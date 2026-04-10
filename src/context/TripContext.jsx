@@ -16,6 +16,10 @@ export const STAGES = {
 
 const TripContext = createContext();
 
+function getExistingCompletedId(tripId, completedTrips) {
+  return completedTrips.find((trip) => trip.sourceTripId === tripId)?.id ?? null;
+}
+
 export function TripProvider({ children }) {
   const [trips, setTrips]               = useState([]);
   const [activeTripId, setActiveTripId] = useState(null);
@@ -276,28 +280,45 @@ export function TripProvider({ children }) {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, stage: newStage } : t));
   }
 
-  async function completeTrip() {
-    if (!activeTrip) return;
+  // Save active trip to history and complete it on the backend
+  async function completeTrip(tripId = activeTrip?.id, extras = {}) {
+    const targetTrip = trips.find((trip) => trip.id === tripId);
+    if (!targetTrip) return;
 
     try {
-      await fetch(`http://localhost:8000/api/trips/${activeTrip.id}/complete`, { method: "PUT" });
+      await fetch(`http://localhost:8000/api/trips/${targetTrip.id}/complete`, { method: "PUT" });
       
-      const completed = {
-        id: activeTrip.id,
-        route: `SG \u2192 ${activeTrip.destination}`,
-        date: activeTrip.date,
-        flight: activeTrip.flight,
-        destination: activeTrip.destination,
-        items: activeTrip.matchData ? activeTrip.matchData.length : 0,
-        kg: activeTrip.matchData ? activeTrip.matchData.reduce((sum, i) => sum + i.weight, 0) : 0,
-        itemsList: Array.isArray(activeTrip.matchData) ? activeTrip.matchData : (activeTrip.matchData ? [activeTrip.matchData] : []),
-        departureVolunteer: activeTrip.handoverData?.volunteer || "Unknown",
-        arrivalVolunteer:   activeTrip.arrivalData?.volunteer || "Unknown",
+      const completedRecord = {
+        id: getExistingCompletedId(targetTrip.id, completedTrips) ?? Date.now(),
+        sourceTripId: targetTrip.id,
+        route: `SG \u2192 ${targetTrip.destination}`,
+        date: targetTrip.date,
+        flight: targetTrip.flight,
+        travellerName: targetTrip.travellerName,
+        destination: targetTrip.destination,
+        items: extras.itemsCount ?? (targetTrip.matchData ? targetTrip.matchData.length : 0),
+        kg: extras.totalWeight ?? (targetTrip.matchData ? targetTrip.matchData.reduce((sum, i) => sum + i.weight, 0) : 0),
+        itemsList: extras.itemsList ?? (Array.isArray(targetTrip.matchData) ? targetTrip.matchData : (targetTrip.matchData ? [targetTrip.matchData] : [])),
+        departureVolunteer: extras.departureVolunteer ?? targetTrip.handoverData?.volunteer ?? "Unknown",
+        arrivalVolunteer: extras.arrivalVolunteer ?? targetTrip.arrivalData?.volunteer ?? "Unknown",
+        pickupProof: extras.pickupProof ?? targetTrip.pickupProof ?? null,
+        deliveryProof: extras.deliveryProof ?? targetTrip.deliveryProof ?? null,
         status: "completed"
       };
-      setCompletedTrips(prev => [completed, ...prev]);
-      setTrips(prev => prev.filter(t => t.id !== activeTrip.id));
-      setActiveTripId(null);
+
+      setCompletedTrips((prev) => {
+        const existingIndex = prev.findIndex((trip) => trip.sourceTripId === targetTrip.id);
+        if (existingIndex === -1) return [completedRecord, ...prev];
+
+        const next = [...prev];
+        next[existingIndex] = { ...next[existingIndex], ...completedRecord };
+        return next;
+      });
+      
+      setTrips((prev) => prev.filter((t) => t.id !== targetTrip.id));
+      if (activeTripId === targetTrip.id) {
+        setActiveTripId(null);
+      }
     } catch (e) {
       console.error("Could not complete trip:", e);
     }
@@ -330,6 +351,7 @@ export function TripProvider({ children }) {
   return (
     <TripContext.Provider value={{
       trips, activeTripId, setActiveTripId, addTrip,
+      updateTrip,
       setStageForTrip,
       tripData: activeTrip, stage, setStage,
       confirmMatches,

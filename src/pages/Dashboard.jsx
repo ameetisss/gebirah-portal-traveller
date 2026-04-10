@@ -6,16 +6,30 @@ import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UI
 import { theme, btn, inputStyle } from "../theme";
 import { useTrip, STAGES } from "../context/TripContext";
 import { useAuth } from "../context/AuthContext";
+import { useVolunteers } from "../context/VolunteerContext";
+import { useRequests } from "../context/RequestContext";
 import TripDetailModal from "../components/TripDetailModal";
+import { staticHistory } from "../data/historyData";
+import { getTripLinkedAssignment } from "../data/volunteerData";
+import { getTravellerLevelProgress } from "../data/badgeData";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { userName } = useAuth();
+  const { assignments, completeAssignment } = useVolunteers();
+  const { updateRequestStatus } = useRequests();
   const {
     trips, activeTripId, setActiveTripId, addTrip, setStageForTrip,
     stage, setStage, tripData, matchAccepted, activeHandover,
-    completedTrips, completeTrip,
+    completedTrips, completeTrip, updateTrip,
   } = useTrip();
+  const modalTrip = trips.find((trip) => trip.id === activeTripId) ?? null;
+  const modalAssignment = getTripLinkedAssignment(modalTrip, assignments);
+  const modalItems = modalAssignment ? [{
+    name: modalAssignment.item,
+    weight: modalAssignment.weightKg,
+    requester: modalAssignment.requesterName,
+  }] : DEMO_HANDOVER.items;
 
   const tripRegistered = trips.length > 0;
 
@@ -41,7 +55,7 @@ export default function Dashboard() {
   const regValid = regForm.destination && regForm.flight && regForm.date && regForm.weight;
   function handleRegister() {
     if (!regValid) return;
-    addTrip(regForm);
+    addTrip({ ...regForm, travellerName: userName });
     setRegForm({ destination: "", flight: "", date: "", weight: "" });
   }
 
@@ -96,7 +110,10 @@ export default function Dashboard() {
     : `Trip to ${tripData?.destination ?? "your destination"} registered \u00b7 Searching for a match`;
 
   // Combined history
-  const allHistory = [...completedTrips];
+  const allHistory = [...completedTrips, ...staticHistory];
+  const travellerStats = allHistory.filter((trip) => trip.travellerName === userName)
+    .reduce((accumulator, trip) => ({ totalTrips: accumulator.totalTrips + 1, totalKg: accumulator.totalKg + Number(trip.kg ?? 0) }), { totalTrips: 0, totalKg: 0 });
+  const travellerLevel = getTravellerLevelProgress(travellerStats.totalKg);
 
   // ── Metrics ───────────────────────────────────────────────────
   const metrics = [
@@ -136,12 +153,21 @@ export default function Dashboard() {
       {selectedTrip && <TripDetailModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} />}
       {showConfirm && (
         <ConfirmModal
-          items={activeHandover?.items || []}
-          onClose={() => { setShowConfirm(false); setStage(STAGES.DEPARTED); }}
+          items={modalItems}
+          onClose={() => { setShowConfirm(false); }}
+          onConfirm={(proof) => {
+            if (modalTrip) updateTrip(modalTrip.id, { pickupProof: proof });
+            if (modalAssignment) {
+              completeAssignment(modalAssignment.id);
+              if (modalAssignment.requestId) updateRequestStatus(modalAssignment.requestId, "inTransit");
+            }
+            setShowConfirm(false);
+            setStage(STAGES.DEPARTED);
+          }}
         />
       )}
 
-      <Topbar />
+      <Topbar travellerProgress={travellerLevel} />
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
 
@@ -204,7 +230,22 @@ export default function Dashboard() {
                     const tMatchArr = Array.isArray(trip.matchData) ? trip.matchData : (trip.matchData ? [trip.matchData] : []);
                     const tAlloc    = tMatched && tMatchArr.length > 0 ? tMatchArr.reduce((a, item) => a + parseFloat(item.weight || 0), 0) : 0;
                     const tPct      = tCap > 0 ? (tAlloc / tCap) * 100 : 0;
-                    const tHandover = trip.handoverData ? { ...trip.handoverData, date: trip.date } : {};
+                    const linkedAssignment = getTripLinkedAssignment(trip, assignments);
+                    const tHandover = linkedAssignment ? {
+                      ...DEMO_HANDOVER,
+                      date: trip.date,
+                      time: linkedAssignment.time,
+                      location: linkedAssignment.location,
+                      volunteer: linkedAssignment.volunteerName,
+                      volunteerPhone: linkedAssignment.volunteerPhone,
+                      totalWeight: linkedAssignment.weightKg,
+                      items: [{
+                        name: linkedAssignment.item,
+                        description: `For ${linkedAssignment.requesterName}`,
+                        weight: linkedAssignment.weightKg,
+                        requester: linkedAssignment.requesterName,
+                      }],
+                    } : { ...DEMO_HANDOVER, date: trip.date };
                     const tChecked  = getArrivalChecked(trip.id);
                     const tAllChecked = Object.keys(tChecked).length > 0 && Object.values(tChecked).every(Boolean);
                     const isLast    = index === trips.length - 1;
@@ -324,7 +365,7 @@ export default function Dashboard() {
                             <button
                               style={{ ...btn("primary"), width: "100%", padding: "8px", fontSize: "12px", opacity: tAllChecked ? 1 : 0.4 }}
                               disabled={!tAllChecked}
-                              onClick={() => { setActiveTripId(trip.id); completeTrip(); setStageForTrip(trip.id, STAGES.COMPLETED); }}
+                              onClick={() => { setActiveTripId(trip.id); completeTrip(trip.id); setStageForTrip(trip.id, STAGES.COMPLETED); }}
                             >
                               Confirm handover \u2014 request complete
                             </button>
