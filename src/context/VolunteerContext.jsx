@@ -9,64 +9,21 @@ export const V_STAGES = {
 };
 
 export const DEMO_ASSIGNMENT = {
-  traveller:         "Sarah L.",
-  travellerPhone:    "+65 9876 5432",
-  travellerInitials: "SL",
-  flight:            "SQ 417",
-  destination:       "Amman, Jordan",
-  departureDate:     "2026-03-31",
-  handoverTime:      "12:30",
-  handoverDate:      "Today",
-  handoverLocation:  "T3 Departure Hall, Level 2",
-  handoverLandmark:  "Near check-in row G, next to information counter",
-  items: [
-    { name: "Clothing",   description: "3 sweaters, 2 jackets", weight: 2.0, requester: "Islamic Relief" },
-    { name: "Stationery", description: "Notebooks and pens",    weight: 0.8, requester: "Human Appeal" },
-  ],
-  totalWeight: 2.8,
+  traveller:         "",
+  travellerPhone:    "",
+  travellerInitials: "",
+  flight:            "",
+  destination:       "",
+  departureDate:     "",
+  handoverTime:      "",
+  handoverDate:      "",
+  handoverLocation:  "",
+  handoverLandmark:  "",
+  items: [],
+  totalWeight: 0,
 };
 
-export const STATIC_VOLUNTEER_HISTORY = [
-  {
-    id: 1,
-    traveller:   "Ahmad S.",
-    destination: "Beirut, Lebanon",
-    date:        "12 Feb 2026",
-    items:       3,
-    kg:          4.5,
-    flight:      "ME 231",
-    itemsList: [
-      { name: "Medicines",        weight: 2.0, requester: "Red Crescent" },
-      { name: "Clothing",         weight: 1.5, requester: "Oxfam" },
-      { name: "Food supplements", weight: 1.0, requester: "Mercy Relief" },
-    ],
-  },
-  {
-    id: 2,
-    traveller:   "Maria K.",
-    destination: "Amman, Jordan",
-    date:        "18 Jan 2026",
-    items:       2,
-    kg:          2.2,
-    flight:      "RJ 105",
-    itemsList: [
-      { name: "Clothing",   weight: 1.4, requester: "Islamic Relief" },
-      { name: "Stationery", weight: 0.8, requester: "Human Appeal" },
-    ],
-  },
-  {
-    id: 3,
-    traveller:   "John D.",
-    destination: "Gaza, Palestine",
-    date:        "5 Jan 2026",
-    items:       1,
-    kg:          1.8,
-    flight:      "EK 355",
-    itemsList: [
-      { name: "Medical supplies", weight: 1.8, requester: "Anera" },
-    ],
-  },
-];
+export const STATIC_VOLUNTEER_HISTORY = [];
 
 // Weekly recurring availability: day → { morning, afternoon, evening }
 const initialAvailability = {
@@ -155,13 +112,16 @@ export function VolunteerProvider({ children }) {
       assignments,
       availability, toggleAvailability,
       completedHistory, allHistory, totalKgDelivered,
-      acceptAssignment, declineAssignment, startHandover, confirmHandover, findMatch,
+      acceptAssignment, declineAssignment, startHandover, confirmHandover, 
+      completeAssignment: confirmHandover, findMatch,
     }}>
       {children}
     </VolunteerContext.Provider>
   );
 }
 
-export function useVolunteer() {
+export function useVolunteers() {
   return useContext(VolunteerContext);
 }
+
+export const useVolunteer = useVolunteers;

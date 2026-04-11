@@ -4,7 +4,7 @@ import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
 import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
-import { useTrip, STAGES } from "../context/TripContext";
+import { useTrip, STAGES, DEMO_HANDOVER } from "../context/TripContext";
 import { useAuth } from "../context/AuthContext";
 import { useVolunteers } from "../context/VolunteerContext";
 import { useRequests } from "../context/RequestContext";
@@ -12,6 +12,7 @@ import TripDetailModal from "../components/TripDetailModal";
 import { staticHistory } from "../data/historyData";
 import { getTripLinkedAssignment } from "../data/volunteerData";
 import { getTravellerLevelProgress } from "../data/badgeData";
+import RegisterTripForm from "../components/RegisterTripForm";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -23,6 +24,9 @@ export default function Dashboard() {
     stage, setStage, tripData, matchAccepted, activeHandover,
     completedTrips, completeTrip, updateTrip,
   } = useTrip();
+
+  // Define allHistory for the traveller
+  const allHistory = [...completedTrips, ...staticHistory];
   const modalTrip = trips.find((trip) => trip.id === activeTripId) ?? null;
   const modalAssignment = getTripLinkedAssignment(modalTrip, assignments);
   const modalItems = modalAssignment ? [{
@@ -49,15 +53,6 @@ export default function Dashboard() {
       [tripId]: typeof updater === "function" ? updater(getArrivalChecked(tripId)) : updater,
     }));
 
-  // Register trip form
-  const [regForm, setRegForm] = useState({ destination: "", flight: "", date: "", weight: "" });
-  const setReg = (k, v) => setRegForm(f => ({ ...f, [k]: v }));
-  const regValid = regForm.destination && regForm.flight && regForm.date && regForm.weight;
-  function handleRegister() {
-    if (!regValid) return;
-    addTrip({ ...regForm, travellerName: userName });
-    setRegForm({ destination: "", flight: "", date: "", weight: "" });
-  }
 
   const stageLabelShort = s => ({
     "upcoming":          "Awaiting match",   // DB default status
@@ -92,10 +87,10 @@ export default function Dashboard() {
   // ── Active-trip derived values — use optional chaining in case handover_data is null in DB ──
   const handoverDate = activeHandover?.date     ?? "TBC";
   const handoverTime = activeHandover?.time     ?? "—";
-  const handoverLoc  = activeHandover?.location ?? "T3 Departure hall, Level 2";
+  const handoverLoc  = activeHandover?.location ?? "TBC";
   const handoverMeet = activeHandover
     ? `${activeHandover.volunteer ?? "Volunteer"} \u00b7 ${activeHandover.volunteerPhone ?? ""}`
-    : "Nurul A. \u00b7 +65 9123 4567";
+    : "Checking for volunteer\u2026";
 
   // ── Page subtitle ─────────────────────────────────────────────
   const destList = trips.map(t => t.destination).join(", ");
@@ -109,9 +104,7 @@ export default function Dashboard() {
     : matchAccepted ? `Handover on ${handoverDate} at ${handoverTime} \u00b7 ${handoverLoc}`
     : `Trip to ${tripData?.destination ?? "your destination"} registered \u00b7 Searching for a match`;
 
-  // Combined history
-  const allHistory = [...completedTrips, ...staticHistory];
-  const travellerStats = allHistory.filter((trip) => trip.travellerName === userName)
+  const travellerStats = completedTrips.filter((trip) => trip.travellerName === userName)
     .reduce((accumulator, trip) => ({ totalTrips: accumulator.totalTrips + 1, totalKg: accumulator.totalKg + Number(trip.kg ?? 0) }), { totalTrips: 0, totalKg: 0 });
   const travellerLevel = getTravellerLevelProgress(travellerStats.totalKg);
 
@@ -466,46 +459,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            {/* Register a trip */}
-            <Card>
-              <CardHeader title="Register a trip" />
-              <div style={{ padding: "20px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {[
-                    { label: "Destination",    key: "destination", placeholder: "e.g. Amman, Jordan",  type: "text" },
-                    { label: "Flight number",  key: "flight",      placeholder: "e.g. SQ 417",         type: "text" },
-                    { label: "Departure date", key: "date",        placeholder: "DD / MM / YYYY",       type: "date" },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <FieldLabel>{f.label}</FieldLabel>
-                      <input
-                        type={f.type}
-                        placeholder={f.placeholder}
-                        value={regForm[f.key]}
-                        onChange={e => setReg(f.key, e.target.value)}
-                        style={inputStyle}
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <FieldLabel>Spare baggage (kg)</FieldLabel>
-                    <input
-                      type="number" placeholder="0.0" min="0" step="0.5"
-                      value={regForm.weight}
-                      onChange={e => setReg("weight", e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
-                  <button
-                    style={{ ...btn("primary"), marginTop: "4px", opacity: regValid ? 1 : 0.4 }}
-                    disabled={!regValid}
-                    onClick={handleRegister}
-                  >
-                    Register trip
-                  </button>
-                </div>
-              </div>
-            </Card>
+            <RegisterTripForm onSubmit={form => addTrip({ ...form, travellerName: userName })} />
           </div>
         </div>
       </div>

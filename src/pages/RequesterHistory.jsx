@@ -33,7 +33,7 @@ export default function RequesterHistory() {
           destination: req.destination,
           deliveredLabel: `Delivered ${new Date(req.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
           routeLabel: req.arrival_info || "Completed delivery",
-          deliveryProof: req.delivery_proof_url ? { url: req.delivery_proof_url } : null,
+          deliveryProof: req.delivery_proof || null,
         }));
         setBackendHistory(mapped);
       }
@@ -116,6 +116,7 @@ export default function RequesterHistory() {
                 </div>
               ))
             )}
+          </div>
         </Card>
       </div>
     </div>

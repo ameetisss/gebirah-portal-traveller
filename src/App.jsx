@@ -3,38 +3,37 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { TripProvider } from "./context/TripContext";
 import { VolunteerProvider } from "./context/VolunteerContext";
 import { RequestProvider } from "./context/RequestContext";
-import { VolunteerProvider } from "./context/VolunteerContext";
+
+// Shared Pages
 import Login     from "./pages/Login";
+
+// Traveller Pages
 import Dashboard from "./pages/Dashboard";
 import MyTrip    from "./pages/MyTrip";
 import History   from "./pages/History";
+
+// Requester Pages
 import RequesterPortal from "./pages/RequesterPortal";
 import RequesterHistory from "./pages/RequesterHistory";
+
+// Gebirah Pages
 import GebirahPortal from "./pages/GebirahPortal";
 import GebirahDashboard from "./pages/GebirahDashboard";
 import GebirahRequests from "./pages/GebirahRequests";
 import GebirahTravellers from "./pages/GebirahTravellers";
 import GebirahHandovers from "./pages/GebirahHandovers";
+
+// Volunteer Pages
 import VolunteerPortal from "./pages/VolunteerPortal";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
 import VolunteerAvailability from "./pages/VolunteerAvailability";
 import VolunteerHistory from "./pages/VolunteerHistory";
 
-// Traveller Pages
-import Login               from "./pages/Login";
-import Dashboard           from "./pages/Dashboard";
-import MyTrip              from "./pages/MyTrip";
-import History             from "./pages/History";
-
-// Volunteer Pages
+// Legacy Volunteer Pages (Old routes)
 import VolunteerLogin       from "./pages/volunteer/VolunteerLogin";
-import VolunteerDashboard   from "./pages/volunteer/VolunteerDashboard";
+import LegacyVolunteerDashboard   from "./pages/volunteer/VolunteerDashboard";
 import VolunteerAssignments from "./pages/volunteer/VolunteerAssignments";
-import VolunteerHistory     from "./pages/volunteer/VolunteerHistory";
-
-// Requester Pages
-import RequesterPortal     from "./pages/RequesterPortal";
-import RequesterHistory    from "./pages/RequesterHistory";
+import LegacyVolunteerHistory     from "./pages/volunteer/VolunteerHistory";
 
 function ProtectedRoute({ children, allowRoles, redirectTo = "/login" }) {
   const { isLoggedIn, userRole } = useAuth();
@@ -68,9 +67,9 @@ function AppRoutes() {
       
       {/* Volunteer routes */}
       <Route path="/volunteer/login"       element={<VolunteerLogin />} />
-      <Route path="/volunteer/dashboard"   element={<ProtectedRoute allowRoles={["volunteer"]} redirectTo="/volunteer/login"><VolunteerDashboard /></ProtectedRoute>} />
+      <Route path="/volunteer/dashboard"   element={<ProtectedRoute allowRoles={["volunteer"]} redirectTo="/volunteer/login"><LegacyVolunteerDashboard /></ProtectedRoute>} />
       <Route path="/volunteer/assignments" element={<ProtectedRoute allowRoles={["volunteer"]} redirectTo="/volunteer/login"><VolunteerAssignments /></ProtectedRoute>} />
-      <Route path="/volunteer/history"     element={<ProtectedRoute allowRoles={["volunteer"]} redirectTo="/volunteer/login"><VolunteerHistory /></ProtectedRoute>} />
+      <Route path="/volunteer/history"     element={<ProtectedRoute allowRoles={["volunteer"]} redirectTo="/volunteer/login"><LegacyVolunteerHistory /></ProtectedRoute>} />
       
       {/* Requester routes */}
       <Route path="/requester"       element={<ProtectedRoute allowRoles={["requester"]}><RequesterPortal /></ProtectedRoute>} />

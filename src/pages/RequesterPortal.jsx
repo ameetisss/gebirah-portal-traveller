@@ -5,7 +5,6 @@ import Topbar from "../components/Topbar";
 import { Card, Badge } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
 import { useRequests } from "../context/RequestContext";
-import { useAuth } from "../context/AuthContext";
 import { useTrip, STAGES } from "../context/TripContext";
 import { getRequestQueue } from "../data/gebirahData";
 import {
@@ -137,7 +136,9 @@ function RequestCard({ request, linkedTrip, onConfirmReceipt }) {
     </Card>
   );
 }
-
+export default function RequesterPortal() {
+  const location = useLocation();
+  const newRequestRef = useRef(null);
   const { userName, userId } = useAuth();
   const { requests, addRequest, updateRequest } = useRequests();
   const { trips, setStageForTrip, completeTrip, updateTrip } = useTrip();
@@ -362,12 +363,22 @@ function RequestCard({ request, linkedTrip, onConfirmReceipt }) {
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <span style={{ fontSize: "13px", color: "#776F63" }}>Destination</span>
-                  <input
+                  <select
                     value={form.destination}
                     onChange={(event) => setField("destination", event.target.value)}
-                    placeholder="City, Country"
-                    style={{ ...inputStyle, padding: "16px 18px", borderRadius: "14px", fontSize: "15px", background: "#FFFFFF", border: "1px solid #D9CFBF" }}
-                  />
+                    style={{ ...inputStyle, padding: "16px 18px", borderRadius: "14px", fontSize: "15px", background: "#FFFFFF", border: "1px solid #D9CFBF", appearance: "none" }}
+                  >
+                    <option value="" disabled>Select destination</option>
+                    <option>Yangon (Myanmar)</option>
+                    <option>Gaza (Palestine)</option>
+                    <option>Rafah (Palestine)</option>
+                    <option>Beirut (Lebanon)</option>
+                    <option>Cairo (Egypt)</option>
+                    <option>Manila (Philippines)</option>
+                    <option>Jakarta (Indonesia)</option>
+                    <option>Phnom Penh (Cambodia)</option>
+                    <option>Saigon (Vietnam)</option>
+                  </select>
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

@@ -68,7 +68,7 @@ export default function Login() {
       if (!/^\+?[\d\s\-]{7,15}$/.test(phone)) { setError("Please enter a valid phone number."); return; }
     }
     setError("");
-    login(method === "email" ? email : phone, method, role);
+    await login(method === "email" ? email : phone, method, role);
     navigate(role === "requester" ? "/requester" : role === "gebirah" ? "/gebirah" : role === "volunteer" ? "/volunteer" : "/dashboard");
   }
 
@@ -92,7 +92,7 @@ export default function Login() {
         width: "100%",
         maxWidth: "1180px",
         display: "grid",
-        gridTemplateColumns: "1.08fr minmax(360px, 0.82fr)",
+        gridTemplateColumns: "1.08fr 0.82fr",
         background: "rgba(255,255,255,0.74)",
         border: "1px solid rgba(170, 155, 136, 0.22)",
         borderRadius: "28px",
@@ -150,11 +150,14 @@ export default function Login() {
             </p>
           </div>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: "14px",
-          }}>
+          <div 
+            className="login-info-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: "14px",
+            }}
+          >
             {[
               { label: "Traveller", text: "Carries matched items within declared spare baggage." },
               { label: "Volunteer", text: "Brings packed items to the airport handover point." },
@@ -229,12 +232,15 @@ export default function Login() {
             </div>
           </div>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: "8px",
-            marginBottom: "18px",
-          }}>
+          <div 
+            className="login-role-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "8px",
+              marginBottom: "18px",
+            }}
+          >
             {[
               { key: "traveller", label: "Traveller" },
               { key: "requester", label: "Requester" },
@@ -396,6 +402,19 @@ export default function Login() {
         @media (max-width: 980px) {
           .login-shell {
             grid-template-columns: 1fr !important;
+          }
+          .login-info-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 580px) {
+          .login-role-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .login-info-grid {
+            gap: 10px !important;
           }
         }
       `}</style>

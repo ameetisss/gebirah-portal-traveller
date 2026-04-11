@@ -152,7 +152,7 @@ export function getHandoverRows(trips, assignments = []) {
 
 export function getGebirahMetrics({ requests, trips, completedTrips, assignments = [] }) {
   const queue = getRequestQueue(requests, trips);
-  const deliveredCount = requests.filter((request) => request.statusKey === "delivered").length + placeholderRequesterHistory.length;
+  const deliveredCount = requests.filter((request) => request.statusKey === "delivered").length;
   const totalRequestsSeen = queue.length + deliveredCount;
   const fulfillmentRate = totalRequestsSeen === 0 ? 0 : Math.round((deliveredCount / totalRequestsSeen) * 100);
   const liveHandovers = getHandoverRows(trips, assignments);
@@ -166,8 +166,7 @@ export function getGebirahMetrics({ requests, trips, completedTrips, assignments
 }
 
 export function getTopTravellerStats(completedTrips) {
-  const allTrips = [...completedTrips, ...staticHistory];
-  const aggregates = allTrips.reduce((accumulator, trip) => {
+  const aggregates = completedTrips.reduce((accumulator, trip) => {
     const key = trip.travellerName ?? "Traveller";
     const current = accumulator.get(key) ?? { name: key, trips: 0, kg: 0 };
     current.trips += 1;

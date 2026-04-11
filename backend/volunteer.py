@@ -31,23 +31,23 @@ def get_volunteer_at_datetime(dt_str: str) -> Optional[str]:
 
     # Query schedules that match the day of week
     res = get_supabase().table("volunteer_schedules").select(
-        "id, start_time, end_time, volunteers(user_id)"
+        "id, start_time, end_time, volunteers(profile_id)"
     ).eq("day_of_week", query_day).execute()
 
     matches = []
     for entry in res.data:
         # PostgreSQL TIME types are compared
         if entry["start_time"] <= query_time < entry["end_time"]:
-            matches.append(entry["volunteers"]["user_id"])
+            matches.append(entry["volunteers"]["profile_id"])
 
     if not matches:
         return None
 
     # Pick a random volunteer from available ones
-    selected_user_id = random.choice(matches)
+    selected_profile_id = random.choice(matches)
     
     # Lookup profile
-    v_profile = get_supabase().table("user_profiles").select("full_name, phone").eq("id", selected_user_id).execute()
+    v_profile = get_supabase().table("user_profiles").select("full_name, phone").eq("id", selected_profile_id).execute()
     
     if v_profile.data:
         return {
@@ -56,9 +56,10 @@ def get_volunteer_at_datetime(dt_str: str) -> Optional[str]:
         }
 
     return {
-        "name": f"Volunteer ({selected_user_id[:8]})",
+        "name": f"Volunteer ({selected_profile_id[:4]})",
         "phone": "+65 9123 4567"
     }
+
 
 def get_schedule_grouped_by_day() -> dict:
     """Return the full schedule grouped by day in weekly order from Supabase."""

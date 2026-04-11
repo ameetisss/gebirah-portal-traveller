@@ -10,7 +10,7 @@ from flights import fetch_regional_flights
 from csv_service import get_flight_details, get_csv_head
 from volunteer import get_all_volunteers, get_volunteers_by_day, get_schedule_grouped_by_day, get_volunteer_at_datetime
 from database import get_supabase
-from models import Trip, LoginRequest, TripCreateRequest, ItemRequest, ItemRequestCreate
+from models import Trip, LoginRequest, TripCreateRequest, ItemRequest, ItemRequestCreate, TripPatchRequest, ItemRequestPatchRequest
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,8 +20,10 @@ app = FastAPI(title="Gebirah Portal Backend")
 # Configure CORS
 origins = [
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
     # Add production frontend URLs here when deployed
 ]
 
@@ -184,6 +186,25 @@ async def update_trip_status(trip_id: str, payload: dict):
         print(f"Error updating status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.patch("/api/trips/{trip_id}")
+async def patch_trip(trip_id: str, request: TripPatchRequest):
+    """Patch a single trip (e.g. upload proofs)"""
+    try:
+        data = request.model_dump(exclude_unset=True)
+        if not data:
+            return {"status": "success", "message": "No changes provided"}
+            
+        supabase = get_supabase()
+        res = supabase.table("trips").update(data).eq("trips_id", trip_id).execute()
+        
+        if res.data:
+            return {"status": "success", "data": res.data[0]}
+        else:
+            raise HTTPException(status_code=404, detail="Trip not found")
+    except Exception as e:
+        print(f"Error patching trip: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 class MatchSelection(BaseModel):
     matches: List[dict]
     total_weight: float
@@ -245,6 +266,49 @@ async def confirm_matches(trip_id: str, selection: MatchSelection):
 # Match endpoints
 # ---------------------------------------------------------------------------
 
+# Hierarchical location clusters (Destination -> [Search Terms])
+# This ensures that a search for a code (RGN) matches both the city (Yangon) and country (Myanmar)
+LOCATION_CLUSTERS = {
+    # Myanmar
+    "RGN": ["Myanmar", "Yangon", "RGN"],
+    "Yangon": ["Myanmar", "Yangon", "RGN"],
+    "Myanmar": ["Myanmar", "Yangon", "RGN"],
+    
+    # Cambodia
+    "PNH": ["Cambodia", "Phnom Penh", "PNH"],
+    "Phnom Penh": ["Cambodia", "Phnom Penh", "PNH"],
+    "Cambodia": ["Cambodia", "Phnom Penh", "PNH"],
+    
+    # Vietnam
+    "SGN": ["Vietnam", "Saigon", "Ho Chi Minh City", "SGN"],
+    "Saigon": ["Vietnam", "Saigon", "Ho Chi Minh City", "SGN"],
+    "HAN": ["Vietnam", "Hanoi", "HAN"],
+    "Hanoi": ["Vietnam", "Hanoi", "HAN"],
+    "Vietnam": ["Vietnam", "Saigon", "Hanoi", "SGN", "HAN"], 
+    
+    # Philippines
+    "MNL": ["Philippines", "Manila", "MNL"],
+    "Manila": ["Philippines", "Manila", "MNL"],
+    "CEB": ["Philippines", "Cebu", "CEB"],
+    "Cebu": ["Philippines", "Cebu", "CEB"],
+    "Philippines": ["Philippines", "Manila", "Cebu", "MNL", "CEB"],
+    
+    # Indonesia
+    "CGK": ["Indonesia", "Jakarta", "CGK"],
+    "Jakarta": ["Indonesia", "Jakarta", "CGK"],
+    "DPS": ["Indonesia", "Bali", "DPS"],
+    "Bali": ["Indonesia", "Bali", "DPS"],
+    "Indonesia": ["Indonesia", "Jakarta", "Bali", "CGK", "DPS"]
+}
+
+def get_search_terms(destination: str) -> list[str]:
+    """Resolve a destination string to a list of matching search terms."""
+    if not destination:
+        return []
+    cleaned = destination.split('(')[0].strip()
+    return LOCATION_CLUSTERS.get(cleaned, [cleaned])
+
+
 @app.get("/api/matches/generate")
 async def generate_match(weight: float, destination: Optional[str] = None):
     """Generate up to 3 matches prioritizing real item_requests."""
@@ -252,11 +316,19 @@ async def generate_match(weight: float, destination: Optional[str] = None):
         supabase = get_supabase()
         
         # 1. Try to find real user requests that are 'Waiting' and fit the weight
-        # We can also filter by destination if provided (exact or partial)
         query = supabase.table("item_requests").select("*, user_profiles(full_name)").eq("status", "Waiting").lte("weight_kg", weight)
         
         if destination:
-            query = query.ilike("destination", f"%{destination}%")
+            terms = get_search_terms(destination)
+            print(f"Generating matches for terms: {terms}")
+            
+            # Use Supabase's OR filter to check for any term in the cluster
+            if len(terms) > 1:
+                or_filter = ",".join([f"destination.ilike.%{t}%" for t in terms])
+                query = query.or_(or_filter)
+            else:
+                query = query.ilike("destination", f"%{terms[0]}%")
+
             
         res = query.execute()
         requests = res.data or []
@@ -273,32 +345,7 @@ async def generate_match(weight: float, destination: Optional[str] = None):
                 "description": f"Urgency: {req['urgency']} · {req['destination']}"
             })
             
-        # 3. If we don't have 3 real requests, fill with catalogue items as fallback
-        if len(data_list) < 3:
-            remaining = 3 - len(data_list)
-            cat_res = supabase.table("catalogue_items").select("*").lte("min_weight_kg", weight).execute()
-            cat_items = cat_res.data or []
-            
-            # Filter out items we already have (by name/description context)
-            existing_names = [d["name"] for d in data_list]
-            for item in cat_items:
-                if len(data_list) >= 3: break
-                if item["name"] not in existing_names:
-                    data_list.append({
-                        "id": f"fallback-{item['id']}",
-                        "name": item["name"],
-                        "weight": float(item["min_weight_kg"]),
-                        "requester": item.get("requester_name") or "Global Relief Fund",
-                        "description": f"Template match from catalogue"
-                    })
-                    
-        # 4. Final hardcoded fallback if still empty
-        if not data_list:
-            data_list = [
-                {"id": "mock-1", "name": "Essential Meds", "weight": 0.5, "requester": "Global Relief Fund", "description": "High Priority"},
-                {"id": "mock-2", "name": "Clothing Pack", "weight": 2.0, "requester": "Islamic Relief", "description": "Standard Support"}
-            ]
-            
+        # 3. No fallbacks - return empty if no real items found
         return {"status": "success", "data": data_list}
     except Exception as e:
         print(f"Match generation error: {e}")
@@ -329,6 +376,36 @@ async def create_item_request(request: ItemRequestCreate):
             raise HTTPException(status_code=500, detail="Failed to create request in database")
     except Exception as e:
         print(f"Error creating item request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/item-requests/{request_id}")
+async def patch_item_request(request_id: str, request: ItemRequestPatchRequest):
+    """Patch a single item request (e.g. status, delivery_proof)"""
+    try:
+        data = request.model_dump(exclude_unset=True)
+        if not data:
+            return {"status": "success", "message": "No changes"}
+            
+        db_data = {}
+        if "status" in data: db_data["status"] = data["status"]
+        if "arrival_info" in data: db_data["arrival_info"] = data["arrival_info"]
+        if "delivery_proof" in data: db_data["delivery_proof"] = data["delivery_proof"]
+        
+        if "routeLabel" in data and "arrival_info" not in db_data:
+            db_data["arrival_info"] = data["routeLabel"]
+            
+        if not db_data:
+            return {"status": "success", "message": "No database fields updated"}
+            
+        supabase = get_supabase()
+        res = supabase.table("item_requests").update(db_data).eq("id", request_id).execute()
+        
+        if res.data:
+            return {"status": "success", "data": res.data[0]}
+        else:
+            raise HTTPException(status_code=404, detail="ItemRequest not found")
+    except Exception as e:
+        print(f"Error patching item request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/item-requests")
@@ -420,14 +497,22 @@ async def lookup_volunteer(datetime: str):
 
 @app.get("/api/overseas-volunteer")
 async def get_overseas_volunteer(destination: str):
-    """Scan database for real overseas volunteers."""
+    """Scan database for overseas volunteers matching the destination."""
     try:
         supabase = get_supabase()
-        # Find volunteers of type 'overseas'
-        # In a real app, you'd match by 'destination' coverage in a coverage table, 
-        # but for now we look for any 'overseas' volunteer.
-        res = supabase.table("volunteers").select("user_profiles(full_name, phone)").eq("type", "overseas").execute()
         
+        # Resolve destination to search terms
+        terms = get_search_terms(destination)
+        print(f"Searching overseas volunteer for terms: {terms}")
+
+        # Try to find volunteers matching any term in the cluster
+        res = supabase.table("volunteers").select("user_profiles(full_name, phone)").eq("type", "overseas").in_("location", terms).execute()
+
+        
+        # If no specific match, try any overseas volunteer
+        if not res.data:
+            res = supabase.table("volunteers").select("user_profiles(full_name, phone)").eq("type", "overseas").execute()
+            
         if res.data:
             choice = random.choice(res.data)
             profile = choice["user_profiles"]
@@ -444,7 +529,7 @@ async def get_overseas_volunteer(destination: str):
                 }
             }
             
-        # Fallback if DB empty
+        # Hardcoded fallback if DB is empty
         return {
             "status": "success", 
             "data": {
@@ -458,3 +543,4 @@ async def get_overseas_volunteer(destination: str):
     except Exception as e:
         print(f"Overseas volunteer lookup error: {e}")
         return {"status": "not_found", "data": None}
+

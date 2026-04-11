@@ -11,7 +11,7 @@ import { getTravellerLevelProgress } from "../data/badgeData";
 export default function History() {
   const { userName } = useAuth();
   const { completedTrips } = useTrip();
-  const allTrips = [...completedTrips, ...staticHistory];
+  const allTrips = [...completedTrips];
   const travellerStats = allTrips.filter((trip) => trip.travellerName === userName)
     .reduce((accumulator, trip) => ({ totalTrips: accumulator.totalTrips + 1, totalKg: accumulator.totalKg + Number(trip.kg ?? 0) }), { totalTrips: 0, totalKg: 0 });
   const travellerLevel = getTravellerLevelProgress(travellerStats.totalKg);

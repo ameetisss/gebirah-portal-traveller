@@ -186,12 +186,12 @@ export default function Topbar({
               animation: "fadeInScale 0.2s ease-out",
             }}>
               <style>
-                {\`
+                {`
                   @keyframes fadeInScale {
                     from { opacity: 0; transform: scale(0.95) translateY(-10px); }
                     to { opacity: 1; transform: scale(1) translateY(0); }
                   }
-                \`}
+                `}
               </style>
               
               <div style={{ padding: "12px 16px", borderBottom: `1px solid ${theme.borderLight}`, marginBottom: "4px" }}>

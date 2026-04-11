@@ -156,7 +156,7 @@ export default function VolunteerDashboard() {
         <aside style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <Card>
             <div style={{ padding: "18px" }}>
-              <div style={{ marginBottom: "14px", fontSize: "16px", fontWeight: "600", color: theme.textPrimary }}>Availability — March 2026</div>
+              <div style={{ marginBottom: "14px", fontSize: "16px", fontWeight: "600", color: theme.textPrimary }}>Availability — May 2026</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px" }}>
                 {["M", "T", "W", "T", "F", "S", "S"].map((day) => (
                   <div key={day} style={{ textAlign: "center", fontSize: "11px", color: theme.textTertiary }}>{day}</div>

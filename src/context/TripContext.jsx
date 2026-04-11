@@ -14,6 +14,28 @@ export const STAGES = {
   UNAVAILABLE:   "unavailable",
 };
 
+export const DEMO_MATCH = [];
+
+export const DEMO_ARRIVAL = {
+  volunteer: "",
+  volunteerPhone: "",
+  location: "",
+  landmark: "",
+  totalWeight: 0,
+  items: []
+};
+
+export const DEMO_HANDOVER = {
+  date: "",
+  time: "",
+  location: "",
+  landmark: "",
+  volunteer: "",
+  volunteerPhone: "",
+  totalWeight: 0,
+  items: []
+};
+
 const TripContext = createContext();
 
 function getExistingCompletedId(tripId, completedTrips) {
@@ -114,7 +136,9 @@ export function TripProvider({ children }) {
       }
 
       // 2. Fetch match from item_requests (prioritized)
-      const mRes = await fetch(`http://localhost:8000/api/matches/generate?weight=${formData.weight || 2.0}&destination=${encodeURIComponent(formData.destination)}`);
+      // Use arrival_airport code if available, otherwise fall back to destination string
+      const matchCriteria = formData.arrival_airport || formData.destination;
+      const mRes = await fetch(`http://localhost:8000/api/matches/generate?weight=${formData.weight || 2.0}&destination=${encodeURIComponent(matchCriteria)}`);
       if (mRes.ok) {
         const mJson = await mRes.json();
         matchData = mJson.data;
@@ -273,6 +297,21 @@ export function TripProvider({ children }) {
       }
     } catch (err) {
       console.error("Failed to update trip status:", err);
+    }
+  }
+
+  async function updateTrip(tripId, patch) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/trips/${tripId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, ...patch } : t));
+      }
+    } catch (err) {
+      console.error("Failed to update trip:", err);
     }
   }
 

@@ -47,67 +47,8 @@ export const requesterStepTemplates = {
   ],
 };
 
-export const placeholderRequesterRequests = [
-  {
-    id: 1,
-    requesterName: "Aisha M.",
-    title: "Item placeholder",
-    weightKg: 0.5,
-    urgency: "High",
-    destination: "Destination placeholder",
-    submittedLabel: "Submitted date placeholder",
-    statusKey: "inTransit",
-    steps: requesterStepTemplates.inTransit,
-    arrival: {
-      type: "expected-arrival",
-      dateLabel: "Arrival date placeholder",
-      flightCode: "Flight placeholder",
-      routeLabel: "Routing placeholder",
-    },
-  },
-  {
-    id: 2,
-    requesterName: "Fatima K.",
-    title: "Second item placeholder",
-    weightKg: 2.0,
-    urgency: "Medium",
-    destination: "Destination placeholder",
-    submittedLabel: "Submitted date placeholder",
-    statusKey: "waiting",
-    steps: requesterStepTemplates.waiting,
-    arrival: {
-      type: "match-pending",
-      message: "Coordinator is sourcing a traveller match",
-    },
-  },
-];
-
-export const placeholderRequesterHistory = [
-  {
-    id: 1,
-    title: "Delivered item placeholder",
-    weightKg: 1.5,
-    destination: "Destination placeholder",
-    deliveredLabel: "Delivered date placeholder",
-    routeLabel: "Flight placeholder via routing placeholder",
-  },
-  {
-    id: 2,
-    title: "Delivered item placeholder",
-    weightKg: 3.0,
-    destination: "Destination placeholder",
-    deliveredLabel: "Delivered date placeholder",
-    routeLabel: "Flight placeholder via routing placeholder",
-  },
-  {
-    id: 3,
-    title: "Delivered item placeholder",
-    weightKg: 0.8,
-    destination: "Destination placeholder",
-    deliveredLabel: "Delivered date placeholder",
-    routeLabel: "Flight placeholder via routing placeholder",
-  },
-];
+export const placeholderRequesterRequests = [];
+export const placeholderRequesterHistory  = [];
 
 export const requesterFormDefaults = {
   description: "",

@@ -50,6 +50,8 @@ class Trip(BaseModel):
     handover_data: Optional[dict] = None
     arrival_data: Optional[dict] = None
     candidate_matches: Optional[List[dict]] = None
+    pickup_proof: Optional[dict] = None
+    delivery_proof: Optional[dict] = None
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -67,6 +69,11 @@ class TripCreateRequest(BaseModel):
     arrival_data: Optional[dict] = None
     candidate_matches: Optional[List[dict]] = None
     allocated_capacity_kg: Optional[float] = 0.0
+
+class TripPatchRequest(BaseModel):
+    pickup_proof: Optional[dict] = None
+    delivery_proof: Optional[dict] = None
+    status: Optional[str] = None
 
 class Flight(BaseModel):
     id: Optional[str] = None
@@ -91,6 +98,7 @@ class ItemRequest(BaseModel):
     reason: Optional[str] = None
     status: str = "Waiting"
     arrival_info: Optional[str] = None
+    delivery_proof: Optional[dict] = None
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -102,3 +110,10 @@ class ItemRequestCreate(BaseModel):
     urgency: str
     destination: str
     reason: Optional[str] = None
+
+class ItemRequestPatchRequest(BaseModel):
+    status: Optional[str] = None
+    arrival_info: Optional[str] = None
+    delivery_proof: Optional[dict] = None
+    deliveredLabel: Optional[str] = None
+    routeLabel: Optional[str] = None
