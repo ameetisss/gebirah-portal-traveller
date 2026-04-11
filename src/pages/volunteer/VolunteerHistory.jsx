@@ -41,8 +41,8 @@ function AssignmentDetailModal({ item, onClose }) {
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "11px", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600", marginBottom: "8px" }}>Items carried</div>
             <div style={{ background: theme.surface, borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden" }}>
-              {item.itemsList.map((it, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: i < item.itemsList.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+              {item.items.map((it, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: i < item.items.length - 1 ? `1px solid ${theme.border}` : "none" }}>
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: "500", color: theme.textPrimary }}>{it.name}</div>
                     <div style={{ fontSize: "11px", color: theme.textSecondary }}>for {it.requester}</div>
@@ -64,8 +64,8 @@ export default function VolunteerHistory() {
   const { allHistory, totalKgDelivered } = useVolunteer();
   const [selected, setSelected] = useState(null);
 
-  const destinations = [...new Set(allHistory.map(h => h.destination.split(",")[0]))];
-  const totalItems   = allHistory.reduce((s, h) => s + h.items, 0);
+  const destinations = [...new Set(allHistory.map(h => h.destination?.split(",")[0] || "Unknown"))];
+  const totalItems   = allHistory.reduce((s, h) => s + (h.items?.length || 0), 0);
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, color: theme.textPrimary, fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif", fontSize: "14px", lineHeight: "1.5" }}>
@@ -118,7 +118,7 @@ export default function VolunteerHistory() {
                       <div style={{ fontSize: "14px", fontWeight: "500", color: theme.textPrimary }}>{h.destination}</div>
                     </div>
                     <div style={{ fontSize: "12px", color: theme.textSecondary }}>
-                      {h.date} &middot; {h.items} items &middot; {h.kg} kg
+                      {h.date} &middot; {h.items?.length || 0} items &middot; {h.kg} kg
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

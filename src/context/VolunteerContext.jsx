@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "./AuthContext";
 
 export const V_STAGES = {
   NONE:      "none",
@@ -25,6 +26,8 @@ export const DEMO_ASSIGNMENT = {
 
 export const STATIC_VOLUNTEER_HISTORY = [];
 
+const VolunteerContext = createContext();
+
 // Weekly recurring availability: day → { morning, afternoon, evening }
 const initialAvailability = {
   Mon: { morning: true,  afternoon: false, evening: false },
@@ -36,65 +39,100 @@ const initialAvailability = {
   Sun: { morning: false, afternoon: false, evening: false },
 };
 
-const VolunteerContext = createContext();
-
 export function VolunteerProvider({ children }) {
+  const { userId, isLoggedIn } = useAuth();
   const [assignments, setAssignments]           = useState([]);
   const [availability, setAvailability]         = useState(initialAvailability);
   const [completedHistory, setCompletedHistory] = useState([]);
 
+  const mapTripToAssignment = useCallback((trip) => {
+    const isHandover = trip.handover_data?.volunteer_id === userId;
+    const data = isHandover ? trip.handover_data : trip.arrival_data;
+    
+    // Safety mapping between backend field names and frontend expectations
+    return {
+      ...data,
+      id: trip.trips_id,
+      stage: data.stage || V_STAGES.PENDING,
+      destination: trip.destination || "Unknown Destination",
+      flight: trip.flight_number || "Trip",
+      departureDate: trip.departure_date || "TBD",
+      items: data.items || [],
+      totalWeight: data.totalWeight || data.total_weight || 0,
+      
+      // Map 'location' to 'handoverLocation' if needed
+      handoverLocation: data.handoverLocation || data.location || "Arrival Hall",
+      handoverLandmark: data.handoverLandmark || data.landmark || "Pillar 4",
+      handoverDate:     data.handoverDate || trip.arrival_date || trip.departure_date || "TBD",
+      handoverTime:     data.handoverTime || "TBD",
+      
+      // Traveller info defaults
+      traveller:         data.traveller || "Traveller",
+      travellerPhone:    data.travellerPhone || "N/A",
+      travellerInitials: data.travellerInitials || (data.traveller ? data.traveller.split(' ').map(n => n[0]).join('').toUpperCase() : "T"),
+
+      // Fields for History and Dashboard
+      kg:                data.kg || data.totalWeight || data.total_weight || 0,
+      items:             data.items || [], // Restore as array
+      date:              data.date || trip.departure_date || "TBD",
+    };
+  }, [userId]);
+
+  const fetchAssignments = useCallback(async () => {
+    if (!isLoggedIn || !userId) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/volunteers/assignments?user_id=${userId}`);
+      const result = await res.json();
+      if (result.status === "success") {
+        const all = result.data.map(mapTripToAssignment);
+        setAssignments(all.filter(a => a.stage !== V_STAGES.COMPLETED));
+        setCompletedHistory(all.filter(a => a.stage === V_STAGES.COMPLETED));
+      }
+    } catch (e) {
+      console.error("Error fetching assignments:", e);
+    }
+  }, [isLoggedIn, userId, mapTripToAssignment]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  async function updateStatus(tripId, newStage) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/volunteers/assignments/${tripId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: newStage, volunteer_id: userId })
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        fetchAssignments();
+      }
+    } catch (e) {
+      console.error("Error updating status:", e);
+    }
+  }
+
   function acceptAssignment(id) {
-    setAssignments(prev => prev.map(a => a.id === id ? { ...a, stage: V_STAGES.ACCEPTED } : a));
+    updateStatus(id, V_STAGES.ACCEPTED);
   }
 
   function declineAssignment(id) {
-    setAssignments(prev => prev.filter(a => a.id !== id));
+    // For demo, we just update status to none or remove locally
+    updateStatus(id, V_STAGES.NONE);
   }
 
   function startHandover(id) {
-    setAssignments(prev => prev.map(a => a.id === id ? { ...a, stage: V_STAGES.HANDOVER } : a));
+    updateStatus(id, V_STAGES.HANDOVER);
   }
 
   function confirmHandover(id) {
-    setAssignments(prev => {
-      const a = prev.find(x => x.id === id);
-      if (a) {
-        setCompletedHistory(hist => [{
-          id:          Date.now(),
-          traveller:   a.traveller,
-          destination: a.destination,
-          date:        new Date().toLocaleDateString('en-GB'),
-          items:       a.items.length,
-          kg:          a.totalWeight,
-          flight:      a.flight,
-          itemsList:   a.items,
-        }, ...hist]);
-      }
-      return prev.map(x => x.id === id ? { ...x, stage: V_STAGES.COMPLETED } : x);
-    });
+    updateStatus(id, V_STAGES.COMPLETED);
   }
 
   function findMatch() {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        setAssignments(prev => ([
-          ...prev,
-          { ...DEMO_ASSIGNMENT, id: Date.now(), stage: V_STAGES.PENDING },
-          { 
-            ...DEMO_ASSIGNMENT, 
-            id: Date.now() + 1, 
-            stage: V_STAGES.PENDING, 
-            flight: "EK 355", 
-            traveller: "John D.", 
-            travellerInitials: "JD",
-            destination: "Gaza, Palestine", 
-            totalWeight: 1.8, 
-            items: [{ name: "Medical supplies", description: "First aid", weight: 1.8, requester: "Anera", requester: "Anera" }] 
-          }
-        ]));
-        resolve();
-      }, 1500);
-    });
+    // Trigger a refresh to see if any new matches were assigned by the backend
+    fetchAssignments();
   }
 
   function toggleAvailability(day, slot) {
@@ -114,6 +152,7 @@ export function VolunteerProvider({ children }) {
       completedHistory, allHistory, totalKgDelivered,
       acceptAssignment, declineAssignment, startHandover, confirmHandover, 
       completeAssignment: confirmHandover, findMatch,
+      fetchAssignments,
     }}>
       {children}
     </VolunteerContext.Provider>

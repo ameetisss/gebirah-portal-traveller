@@ -89,6 +89,28 @@ async def login(request: LoginRequest):
             
         res = query.execute()
         
+        # --- DEMO OVERRIDE: Persistent Volunteer Profile ---
+        CANONICAL_ZAYAR_ID = "e3fc5e69-db54-4cdf-b2b1-377358040670"
+        
+        if request.role == "volunteer":
+            # If logging in as 'volunteer' (no email/phone provided in a way that matches)
+            # or if using a generic identifier, always return the Zayar Lin account.
+            is_generic = False
+            if not request.email and not request.phone:
+                is_generic = True
+            elif request.email == "volunteer@example.com" or request.phone == "volunteer":
+                is_generic = True
+            elif not res.data:
+                # If no user found, instead of creating a NEW anonymous user, 
+                # let's assume this is the demo user.
+                is_generic = True
+                
+            if is_generic:
+                res_canonical = supabase.table("user_profiles").select("*").eq("id", CANONICAL_ZAYAR_ID).execute()
+                if res_canonical.data:
+                    return {"status": "success", "data": res_canonical.data[0]}
+        # ---------------------------------------------------
+
         if res.data:
             user_data = res.data[0]
             # Always trust the role the user selected on the login page
@@ -228,10 +250,11 @@ async def confirm_matches(trip_id: str, selection: MatchSelection):
         
         # 1.5. Ensure a volunteer is assigned to the handover
         if not handover.get("volunteer"):
-            v_res = supabase.table("user_profiles").select("full_name, phone").eq("role", "volunteer").neq("phone", None).execute()
+            v_res = supabase.table("user_profiles").select("id, full_name, phone").eq("role", "volunteer").neq("phone", None).execute()
             if v_res.data:
                 volunteer = random.choice(v_res.data)
                 handover.update({
+                    "volunteer_id": volunteer["id"],
                     "volunteer": volunteer["full_name"],
                     "volunteerPhone": volunteer["phone"],
                     "volunteerInitials": "".join([n[0] for n in volunteer["full_name"].split()[:2]]).upper(),
@@ -495,6 +518,93 @@ async def lookup_volunteer(datetime: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/volunteers/assignments")
+async def get_volunteer_assignments(user_id: Optional[str] = None):
+    """Fetch trips where the user is an assigned volunteer (handover or arrival)."""
+    try:
+        # --- DEMO OVERRIDE: ALWAYS USE ZAYAR LIN'S ID ---
+        target_id = "e3fc5e69-db54-4cdf-b2b1-377358040670"
+        # ------------------------------------------------
+
+        supabase = get_supabase()
+        
+        # We need to query both handover_data and arrival_data for our ID
+        # PostgREST JSON path filtering: table.column->>path = value
+        h_res = supabase.table("trips").select("*").eq("handover_data->>volunteer_id", target_id).execute()
+        a_res = supabase.table("trips").select("*").eq("arrival_data->>volunteer_id", target_id).execute()
+        
+        print(f"Volunteer Assignments Debug: target_id={target_id}, handover={len(h_res.data)}, arrival={len(a_res.data)}")
+        
+        combined = h_res.data + a_res.data
+        
+        # Deduplicate if assigned to both (rare but possible)
+        seen_ids = set()
+        unique_trips = []
+        for t in combined:
+            if t["trips_id"] not in seen_ids:
+                unique_trips.append(t)
+                seen_ids.add(t["trips_id"])
+                
+        return {"status": "success", "data": unique_trips}
+    except Exception as e:
+        print(f"Error fetching assignments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/volunteers/assignments/{trip_id}/status")
+async def update_assignment_status(trip_id: str, payload: dict):
+    """Update the status within handover_data or arrival_data for a volunteer."""
+    try:
+        new_stage = payload.get("stage")
+        volunteer_id = payload.get("volunteer_id")
+        if not new_stage or not volunteer_id:
+            raise HTTPException(status_code=400, detail="stage and volunteer_id are required")
+            
+        supabase = get_supabase()
+        trip_res = supabase.table("trips").select("*").eq("trips_id", trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        trip = trip_res.data[0]
+        handover = trip.get("handover_data") or {}
+        arrival = trip.get("arrival_data") or {}
+        
+        updated = False
+        if handover.get("volunteer_id") == volunteer_id:
+            handover["stage"] = new_stage
+            updated = True
+        if arrival.get("volunteer_id") == volunteer_id:
+            arrival["stage"] = new_stage
+            updated = True
+            
+        if not updated:
+            raise HTTPException(status_code=403, detail="Volunteer not assigned to this trip")
+            
+        res = supabase.table("trips").update({
+            "handover_data": handover,
+            "arrival_data": arrival
+        }).eq("trips_id", trip_id).execute()
+        
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        print(f"Error updating assignment status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/volunteers/own-availability")
+async def get_own_availability(user_id: str):
+    """Fetch availability for the logged-in volunteer."""
+    try:
+        supabase = get_supabase()
+        # Find the volunteer entry for this user_id
+        v_res = supabase.table("volunteers").select("user_id").eq("profile_id", user_id).execute()
+        if not v_res.data:
+            return {"status": "success", "data": []}
+            
+        vol_id = v_res.data[0]["user_id"]
+        res = supabase.table("volunteer_schedules").select("*").eq("volunteer_id", vol_id).execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/overseas-volunteer")
 async def get_overseas_volunteer(destination: str):
     """Scan database for overseas volunteers matching the destination."""
@@ -521,6 +631,7 @@ async def get_overseas_volunteer(destination: str):
             return {
                 "status": "success", 
                 "data": {
+                    "volunteer_id": profile.get("id"),
                     "volunteer": name,
                     "volunteerInitials": initials,
                     "volunteerPhone": profile.get("phone", "+962 79 123 4567"),

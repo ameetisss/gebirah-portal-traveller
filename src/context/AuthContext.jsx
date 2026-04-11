@@ -3,10 +3,11 @@ import { createContext, useContext, useState } from "react";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
+  const initialRole = localStorage.getItem("userRole") || "traveller";
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("userId"));
-  const [userName, setUserName] = useState(localStorage.getItem("userName") || "User");
-  const [userRole, setUserRole] = useState(localStorage.getItem("userRole") || "traveller");
-  const [userId, setUserId] = useState(localStorage.getItem("userId"));
+  const [userName, setUserName] = useState(initialRole === "volunteer" ? "Zayar Lin" : (localStorage.getItem("userName") || "User"));
+  const [userRole, setUserRole] = useState(initialRole);
+  const [userId, setUserId] = useState(initialRole === "volunteer" ? "e3fc5e69-db54-4cdf-b2b1-377358040670" : localStorage.getItem("userId"));
 
   async function login(identifier, method, role = "traveller") {
     try {

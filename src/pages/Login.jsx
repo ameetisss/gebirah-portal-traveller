@@ -69,7 +69,7 @@ export default function Login() {
     }
     setError("");
     await login(method === "email" ? email : phone, method, role);
-    navigate(role === "requester" ? "/requester" : role === "gebirah" ? "/gebirah" : role === "volunteer" ? "/volunteer" : "/dashboard");
+    navigate(role === "requester" ? "/requester" : role === "gebirah" ? "/gebirah" : role === "volunteer" ? "/volunteer/dashboard" : "/dashboard");
   }
 
   const activeRole = roleContent[role];

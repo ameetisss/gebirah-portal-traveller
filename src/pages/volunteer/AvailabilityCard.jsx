@@ -58,7 +58,7 @@ export default function AvailabilityCard({ availability, toggleAvailability, fin
               <div style={{ fontSize: "10px", color: theme.textTertiary, marginTop: "2px" }}>{getNextDateForDay(day)}</div>
             </div>
             {SLOTS.map(slot => {
-              const active = availability[day][slot.key];
+              const active = availability[day]?.[slot.key] || false;
               return (
                 <button key={slot.key}
                   style={{

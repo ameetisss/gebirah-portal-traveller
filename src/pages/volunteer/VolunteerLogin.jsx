@@ -32,7 +32,7 @@ export default function VolunteerLogin() {
     }
     if (password.length < 6) { setError("Incorrect credentials."); return; }
     setError("");
-    login(method === "email" ? email : phone, method);
+    login(method === "email" ? email : phone, method, "volunteer");
     navigate("/volunteer/dashboard");
   }
 
