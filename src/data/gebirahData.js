@@ -12,6 +12,10 @@ export const gebirahNavItems = [
   { path: "/gebirah/requests", label: "Requests" },
   { path: "/gebirah/travellers", label: "Travellers" },
   { path: "/gebirah/handovers", label: "Handovers" },
+  { path: "/gebirah/volunteers", label: "Volunteers" },
+  { path: "/gebirah/exceptions", label: "Exceptions" },
+  { path: "/gebirah/audit", label: "Audit log" },
+  { path: "/gebirah/analytics", label: "Analytics" },
 ];
 
 export const urgencyStyles = {
@@ -33,6 +37,9 @@ export const travellerStageStyles = {
   [STAGES.DEPARTED]: { label: "In transit", color: "#547B30", bg: "#E8F2D8" },
   [STAGES.ARRIVAL]: { label: "Arrival handover", color: "#547B30", bg: "#E8F2D8" },
   [STAGES.COMPLETED]: { label: "Completed", color: "#547B30", bg: "#E8F2D8" },
+  [STAGES.UPCOMING]: { label: "Upcoming", color: "#8A6427", bg: "#F7EBD5" },
+  [STAGES.DECLINED]: { label: "Declined", color: "#A24A4A", bg: "#FBE7E4" },
+  [STAGES.UNAVAILABLE]: { label: "Unavailable", color: "#6F695F", bg: "#F1ECE4" },
 };
 
 const MATCHED_STAGES = [STAGES.MATCH, STAGES.HANDOVER];

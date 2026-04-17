@@ -1,52 +1,80 @@
-import { Card, Badge } from "../components/UIKit";
-import { theme } from "../theme";
-import { useTrip } from "../context/TripContext";
-import { useVolunteers } from "../context/VolunteerContext";
-import { getHandoverRows } from "../data/gebirahData";
+import { useState, useContext } from "react";
+import { theme, container, btn } from "../theme";
+import { Card, Badge, LoadingState } from "../components/UIKit";
+import { TripContext } from "../context/TripContext";
 
 export default function GebirahHandovers() {
-  const { trips } = useTrip();
-  const { assignments } = useVolunteers();
-  const handovers = getHandoverRows(trips, assignments);
+  const { trips, loading, dispatchHandoverBrief } = useContext(TripContext);
+  const [dispatching, setDispatching] = useState(null);
+
+  const handoverTrips = trips.filter(t => t.status === "handover" || t.status === "in_transit");
+
+  const handleDispatchBrief = async (tripId) => {
+    setDispatching(tripId);
+    await dispatchHandoverBrief(tripId);
+    setDispatching(null);
+  };
+
+  if (loading) return <LoadingState />;
 
   return (
-    <>
-      <div style={{ marginBottom: "22px" }}>
-        <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "600", letterSpacing: "-0.05em" }}>Handovers</h1>
-        <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#786F62" }}>
-          Departure-side schedules driven by the traveller journeys currently in handover or in-transit stages.
-        </p>
+    <div style={container}>
+      <div style={{ marginBottom: "32px" }}>
+        <h1 style={{ fontSize: "32px", fontWeight: "700", marginBottom: "8px" }}>Handover Schedule</h1>
+        <p style={{ color: theme.textSecondary }}>Manage airport handovers and dispatch briefs</p>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-        {handovers.length === 0 && (
-          <Card>
-            <div style={{ padding: "24px", fontSize: "14px", color: theme.textSecondary }}>No handovers are scheduled from current traveller trips.</div>
-          </Card>
-        )}
-        {handovers.map((handover) => (
-          <Card key={handover.id}>
-            <div style={{ display: "grid", gridTemplateColumns: "5px 1fr" }}>
-              <div style={{ background: handover.borderColor }} />
-              <div style={{ padding: "20px 22px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start", flexWrap: "wrap", marginBottom: "10px" }}>
-                  <div>
-                    <div style={{ fontSize: "19px", fontWeight: "600", color: theme.textPrimary, letterSpacing: "-0.03em" }}>
-                      {handover.time} · {handover.location}
-                    </div>
-                    <div style={{ marginTop: "4px", fontSize: "14px", color: theme.textSecondary }}>{handover.date} · Route: {handover.route}</div>
+      <div style={{ display: "grid", gap: "20px" }}>
+        {handoverTrips.length === 0 ? (
+          <div style={{ padding: "48px", textAlign: "center", color: theme.textSecondary }}>
+            No handovers scheduled currently.
+          </div>
+        ) : handoverTrips.map((trip) => {
+          const handover = trip.handoverData || trip.handover_data || {};
+          const isDispatched = handover.brief_dispatched || handover.briefDispatched;
+
+          return (
+            <Card key={trip.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "24px" }}>
+                <div style={{ display: "flex", gap: "20px" }}>
+                  <div style={{
+                    width: "48px", height: "48px", borderRadius: "12px", background: "#F5F5F0",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px"
+                  }}>
+                    ✈️
                   </div>
-                  <Badge color={theme.textSecondary} bg={theme.surface}>{handover.status}</Badge>
+                  <div>
+                    <h3 style={{ margin: "0 0 4px 0", fontSize: "18px", fontWeight: "600" }}>{trip.flight || trip.flight_number} to {trip.destination}</h3>
+                    <div style={{ fontSize: "14px", color: theme.textSecondary }}>
+                      {trip.date || trip.departure_date} · {handover.location || "Terminal Departure Hall"}
+                    </div>
+                    <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
+                      <Badge bg="#E8F5E9" color="#2E7D32">
+                        {handover.volunteer || "Unassigned"} (Volunteer)
+                      </Badge>
+                      <Badge bg="#E3F2FD" color="#1976D2">
+                        {trip.travellerName || trip.traveller_name || "Traveller"}
+                      </Badge>
+                      {isDispatched && (
+                        <Badge bg="#FFF9C4" color="#FBC02D">Brief Dispatched</Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: "15px", color: theme.textPrimary }}>{handover.summary}</div>
-                {handover.requesterName && (
-                  <div style={{ marginTop: "6px", fontSize: "13px", color: theme.textSecondary }}>Requester: {handover.requesterName} · Volunteer: {handover.volunteerName}</div>
-                )}
+                <div>
+                  <button 
+                    onClick={() => handleDispatchBrief(trip.id)}
+                    disabled={isDispatched || dispatching === trip.id}
+                    style={isDispatched ? btn("secondary") : btn("primary")}
+                  >
+                    {dispatching === trip.id ? "Sending..." : isDispatched ? "Brief Dispatched" : "Dispatch Brief"}
+                  </button>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 }

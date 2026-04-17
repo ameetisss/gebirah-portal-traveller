@@ -74,3 +74,30 @@ export function CardHeader({ title, right }) {
     </div>
   );
 }
+
+export function LoadingState() {
+  return (
+    <div style={{
+      padding: "80px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      color: theme.textSecondary,
+      gap: "16px"
+    }}>
+      <div style={{
+        width: "32px",
+        height: "32px",
+        border: `3px solid ${theme.border}`,
+        borderTopColor: theme.primary,
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite"
+      }} />
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+      <div style={{ fontSize: "14px", fontWeight: "500" }}>Loading portal data...</div>
+    </div>
+  );
+}

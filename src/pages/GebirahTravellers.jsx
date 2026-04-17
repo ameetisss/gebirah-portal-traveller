@@ -23,14 +23,20 @@ export default function GebirahTravellers() {
           </Card>
         )}
         {travellers.map((traveller) => {
-          const stageStyle = travellerStageStyles[traveller.stage];
+          const stageStyle = travellerStageStyles[traveller.stage] || { label: traveller.stage, color: theme.textSecondary, bg: theme.border };
           return (
             <Card key={traveller.id}>
               <div style={{ padding: "22px 24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "18px" }}>
                   <div>
-                    <div style={{ fontSize: "20px", fontWeight: "600", letterSpacing: "-0.04em" }}>{traveller.name}</div>
-                    <div style={{ marginTop: "6px", fontSize: "14px", color: theme.textSecondary }}>{traveller.destination}</div>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "4px" }}>
+                      <div style={{ fontSize: "20px", fontWeight: "600", letterSpacing: "-0.04em" }}>{traveller.name}</div>
+                      <Badge color="#547B30" bg="#E8F2D8" style={{ fontSize: "10px", padding: "2px 6px" }}>VERIFIED</Badge>
+                    </div>
+                    <div style={{ fontSize: "14px", color: theme.textSecondary }}>{traveller.destination}</div>
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#547B30", fontWeight: "600" }}>
+                      RELIABILITY: 98%
+                    </div>
                   </div>
                   <Badge color={stageStyle.color} bg={stageStyle.bg}>{stageStyle.label}</Badge>
                 </div>

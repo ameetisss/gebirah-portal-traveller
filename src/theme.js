@@ -18,6 +18,14 @@ export const theme = {
   textPrimary: "#0f0f0f",
   textSecondary: "#555555",
   textTertiary: "#888888",
+  primary: "#7C6EF8",
+};
+
+export const container = {
+  maxWidth: "1280px",
+  margin: "0 auto",
+  padding: "40px 24px",
+  minHeight: "100vh",
 };
 
 export function btn(variant = "default") {
@@ -35,7 +43,7 @@ export function btn(variant = "default") {
       color: "#fff",
       boxShadow: "0 10px 24px rgba(124, 110, 248, 0.18)",
     }),
-    ...(variant === "ghost" && {
+    ...((variant === "ghost" || variant === "secondary") && {
       background: "#fff",
       color: theme.textSecondary,
       border: `1px solid ${theme.border}`,

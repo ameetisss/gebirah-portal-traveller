@@ -12,6 +12,7 @@ export const STAGES = {
   NO_VOLUNTEER:  "no_volunteer",
   DECLINED:      "declined",
   UNAVAILABLE:   "unavailable",
+  UPCOMING:      "upcoming",
 };
 
 export const DEMO_MATCH = [];
@@ -36,7 +37,7 @@ export const DEMO_HANDOVER = {
   items: []
 };
 
-const TripContext = createContext();
+export const TripContext = createContext();
 
 function getExistingCompletedId(tripId, completedTrips) {
   return completedTrips.find((trip) => trip.sourceTripId === tripId)?.id ?? null;
@@ -47,7 +48,7 @@ export function TripProvider({ children }) {
   const [activeTripId, setActiveTripId] = useState(null);
   const [completedTrips, setCompletedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
 
   // Fetch initial data from backend when the component mounts or userId changes
   useEffect(() => {
@@ -61,7 +62,11 @@ export function TripProvider({ children }) {
       
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/api/trips/history?traveller_id=${userId}`);
+        const url = userRole === 'gebirah' 
+          ? `http://localhost:8000/api/trips/history` 
+          : `http://localhost:8000/api/trips/history?traveller_id=${userId}`;
+          
+        const res = await fetch(url);
         if (res.ok) {
           const result = await res.json();
           // Map database fields to frontend expectations
@@ -76,6 +81,7 @@ export function TripProvider({ children }) {
             matchData: t.match_data,
             arrivalData: t.arrival_data,
             candidateMatches: t.candidate_matches,
+            travellerName: t.user_profiles?.full_name || "Traveller",
             ...t
           }));
           
@@ -315,6 +321,22 @@ export function TripProvider({ children }) {
     }
   }
 
+  async function dispatchHandoverBrief(tripId) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/trips/${tripId}/dispatch-brief`, {
+        method: "PUT"
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, handover_data: result.data.handover_data } : t));
+        return true;
+      }
+    } catch (err) {
+      console.error("Failed to dispatch brief:", err);
+    }
+    return false;
+  }
+
   function setStageForTrip(tripId, newStage) {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, stage: newStage } : t));
   }
@@ -396,7 +418,7 @@ export function TripProvider({ children }) {
       confirmMatches,
       matchAccepted, activeHandover, activeMatch, activeArrival,
       completedTrips, completeTrip, resetTrip,
-      updateTripStatus,
+      updateTripStatus, dispatchHandoverBrief,
       loading
     }}>
       {children}

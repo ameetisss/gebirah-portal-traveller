@@ -6,12 +6,30 @@ import {
   requesterStepTemplates,
 } from "../data/requesterData";
 
-const RequestContext = createContext();
+export const RequestContext = createContext();
 
 export function RequestProvider({ children }) {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const logActivity = async (action, entityType, entityId, metadata = {}) => {
+    try {
+      await fetch("http://localhost:8000/api/activity-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actor_name: "Coordinator",
+          action,
+          entity_type: entityType,
+          entity_id: String(entityId),
+          metadata
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to log activity:", e);
+    }
+  };
 
   // Map DB record to Frontend Request format
   const mapDbToRequest = (db) => ({
@@ -32,9 +50,9 @@ export function RequestProvider({ children }) {
   useEffect(() => {
     async function fetchRequests() {
       try {
-        const url = user?.id 
+        const url = user?.id && user?.role !== 'gebirah'
           ? `http://localhost:8000/api/item-requests?user_id=${user.id}`
-          : `http://localhost:8000/api/item-requests`; // Fetch all if no user (for demo)
+          : `http://localhost:8000/api/item-requests`; // Fetch all if no user or admin
         
         const res = await fetch(url);
         if (res.ok) {
@@ -48,7 +66,7 @@ export function RequestProvider({ children }) {
       }
     }
     fetchRequests();
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   async function addRequest(form, requesterName) {
     try {
@@ -92,6 +110,42 @@ export function RequestProvider({ children }) {
     setRequests((current) => current.map((request) => (
       request.id === requestId ? { ...request, statusKey } : request
     )));
+    
+    await logActivity(`update_status_${statusKey}`, "request", requestId);
+  }
+
+  async function manuallyAssignRequest(requestId, tripId) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/item-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Matched", arrival_info: "Manually assigned" }),
+      });
+      if (res.ok) {
+        setRequests((current) => current.map((request) => (
+          request.id === requestId ? { ...request, statusKey: "matched" } : request
+        )));
+        await logActivity("manual_assignment", "request", requestId, { trip_id: tripId });
+      }
+    } catch (e) {
+      console.error("Manual assignment failed:", e);
+    }
+  }
+
+  async function requeueRequest(requestId, reason) {
+    try {
+      const res = await fetch(`http://localhost:8000/api/item-requests/${requestId}/requeue`, {
+        method: "PUT"
+      });
+      if (res.ok) {
+        setRequests((current) => current.map((request) => (
+          request.id === requestId ? { ...request, statusKey: "waiting" } : request
+        )));
+        await logActivity("exception_requeue", "request", requestId, { reason });
+      }
+    } catch (e) {
+      console.error("Re-queue failed:", e);
+    }
   }
 
   async function updateRequest(requestId, patch) {
@@ -117,7 +171,7 @@ export function RequestProvider({ children }) {
   }
 
   return (
-    <RequestContext.Provider value={{ requests, loading, addRequest, updateRequestStatus, updateRequest }}>
+    <RequestContext.Provider value={{ requests, loading, addRequest, updateRequestStatus, updateRequest, manuallyAssignRequest, requeueRequest, logActivity }}>
       {children}
     </RequestContext.Provider>
   );

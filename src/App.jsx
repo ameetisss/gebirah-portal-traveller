@@ -22,6 +22,10 @@ import GebirahDashboard from "./pages/GebirahDashboard";
 import GebirahRequests from "./pages/GebirahRequests";
 import GebirahTravellers from "./pages/GebirahTravellers";
 import GebirahHandovers from "./pages/GebirahHandovers";
+import GebirahAnalytics from "./pages/GebirahAnalytics";
+import GebirahVolunteerManagement from "./pages/GebirahVolunteerManagement";
+import GebirahExceptionHandling from "./pages/GebirahExceptionHandling";
+import GebirahAuditLog from "./pages/GebirahAuditLog";
 
 // Volunteer Pages
 import VolunteerPortal from "./pages/VolunteerPortal";
@@ -79,6 +83,10 @@ function AppRoutes() {
         <Route path="requests" element={<GebirahRequests />} />
         <Route path="travellers" element={<GebirahTravellers />} />
         <Route path="handovers" element={<GebirahHandovers />} />
+        <Route path="volunteers" element={<GebirahVolunteerManagement />} />
+        <Route path="exceptions" element={<GebirahExceptionHandling />} />
+        <Route path="audit" element={<GebirahAuditLog />} />
+        <Route path="analytics" element={<GebirahAnalytics />} />
       </Route>
       <Route path="/volunteer" element={<ProtectedRoute allowRoles={["volunteer"]}><VolunteerPortal /></ProtectedRoute>}>
         <Route index element={<VolunteerDashboard />} />

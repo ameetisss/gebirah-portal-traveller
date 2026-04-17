@@ -49,6 +49,8 @@ export function VolunteerProvider({ children }) {
     const isHandover = trip.handover_data?.volunteer_id === userId;
     const data = isHandover ? trip.handover_data : trip.arrival_data;
     
+    if (!data) return null;
+
     // Safety mapping between backend field names and frontend expectations
     return {
       ...data,
@@ -84,7 +86,7 @@ export function VolunteerProvider({ children }) {
       const res = await fetch(`http://localhost:8000/api/volunteers/assignments?user_id=${userId}`);
       const result = await res.json();
       if (result.status === "success") {
-        const all = result.data.map(mapTripToAssignment);
+        const all = result.data.map(mapTripToAssignment).filter(a => a !== null);
         setAssignments(all.filter(a => a.stage !== V_STAGES.COMPLETED));
         setCompletedHistory(all.filter(a => a.stage === V_STAGES.COMPLETED));
       }

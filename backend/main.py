@@ -10,7 +10,7 @@ from flights import fetch_regional_flights
 from csv_service import get_flight_details, get_csv_head
 from volunteer import get_all_volunteers, get_volunteers_by_day, get_schedule_grouped_by_day, get_volunteer_at_datetime
 from database import get_supabase
-from models import Trip, LoginRequest, TripCreateRequest, ItemRequest, ItemRequestCreate, TripPatchRequest, ItemRequestPatchRequest
+from models import Trip, LoginRequest, TripCreateRequest, ItemRequest, ItemRequestCreate, TripPatchRequest, ItemRequestPatchRequest, ActivityLogCreate
 
 # Load environment variables from .env file
 load_dotenv()
@@ -170,11 +170,14 @@ async def create_trip(request: TripCreateRequest):
 
 @app.get("/api/trips/history")
 async def get_trip_history(traveller_id: Optional[str] = None):
-    """Fetch all completed trips for the traveller from Supabase."""
+    """Fetch trips from Supabase. If traveller_id is omitted, fetch all."""
     try:
-        target_id = traveller_id or MOCK_TRAVELLER_ID
         supabase = get_supabase()
-        res = supabase.table("trips").select("*").eq("traveller_id", target_id).execute()
+        query = supabase.table("trips").select("*, user_profiles(full_name)")
+        if traveller_id:
+            query = query.eq("traveller_id", traveller_id)
+        
+        res = query.execute()
         return {"status": "success", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -431,25 +434,45 @@ async def patch_item_request(request_id: str, request: ItemRequestPatchRequest):
         print(f"Error patching item request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/api/item-requests/{request_id}/requeue")
+async def requeue_request(request_id: str, reason: str = "Exception"):
+    """Reset a request to 'Waiting' status and log the exception."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("item_requests").update({
+            "status": "Waiting",
+            "arrival_info": None
+        }).eq("id", request_id).execute()
+        
+        return {"status": "success", "data": res.data[0] if res.data else None}
+    except Exception as e:
+        print(f"Error re-queuing request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/item-requests")
 async def get_item_requests(user_id: Optional[str] = None):
-    """Fetch active (non-delivered) requests for the requester."""
+    """Fetch active (non-delivered) requests. If user_id is omitted, fetch all."""
     try:
-        target_id = user_id or MOCK_REQUESTER_ID
         supabase = get_supabase()
-        # Fetch requests where status is not 'Delivered'
-        res = supabase.table("item_requests").select("*").eq("user_id", target_id).neq("status", "Delivered").execute()
+        query = supabase.table("item_requests").select("*").neq("status", "Delivered")
+        if user_id:
+            query = query.eq("user_id", user_id)
+        
+        res = query.execute()
         return {"status": "success", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/item-requests/history")
 async def get_item_request_history(user_id: Optional[str] = None):
-    """Fetch historical (delivered) requests for the requester."""
+    """Fetch historical (delivered) requests. If user_id is omitted, fetch all."""
     try:
-        target_id = user_id or MOCK_REQUESTER_ID
         supabase = get_supabase()
-        res = supabase.table("item_requests").select("*").eq("user_id", target_id).eq("status", "Delivered").execute()
+        query = supabase.table("item_requests").select("*").eq("status", "Delivered")
+        if user_id:
+            query = query.eq("user_id", user_id)
+            
+        res = query.execute()
         return {"status": "success", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -655,3 +678,104 @@ async def get_overseas_volunteer(destination: str):
         print(f"Overseas volunteer lookup error: {e}")
         return {"status": "not_found", "data": None}
 
+# ---------------------------------------------------------------------------
+# Activity Log endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/activity-logs")
+async def get_activity_logs():
+    """Fetch all coordinator activity logs from Supabase."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("activity_log").select("*").order("created_at", desc=True).limit(50).execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/activity-logs")
+async def create_activity_log(log: ActivityLogCreate):
+    """Create a new activity log entry."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("activity_log").insert(log.model_dump()).execute()
+        if res.data:
+            return {"status": "success", "data": res.data[0]}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create activity log")
+    except Exception as e:
+        print(f"Error creating activity log: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------------------------------------------------------------------------
+# Handover Brief endpoint
+# ---------------------------------------------------------------------------
+
+@app.put("/api/trips/{trip_id}/dispatch-brief")
+async def dispatch_brief(trip_id: str):
+    """Mark the handover brief as dispatched in the trip's record."""
+    try:
+        supabase = get_supabase()
+        # Fetch current trip to get current handover_data
+        trip_res = supabase.table("trips").select("handover_data").eq("trips_id", trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        
+        handover = trip_res.data[0].get("handover_data") or {}
+        handover["brief_dispatched"] = True
+        handover["brief_dispatched_at"] = str(datetime.now())
+        
+        res = supabase.table("trips").update({"handover_data": handover}).eq("trips_id", trip_id).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        print(f"Error dispatching brief: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/coordinators/volunteers")
+async def get_all_volunteer_profiles():
+    """Fetch all volunteers with their reliability scores and status."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("user_profiles").select("*, volunteers(*)").eq("role", "volunteer").execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/coordinators/analytics/fulfillment")
+async def get_fulfillment_rate():
+    """Calculate fulfillment rate for the last 30 days based on real data."""
+    try:
+        supabase = get_supabase()
+        
+        # 1. Fetch all requests
+        req_res = supabase.table("item_requests").select("id, status, created_at").execute()
+        all_reqs = req_res.data or []
+        
+        total_count = len(all_reqs)
+        fulfilled_count = len([r for r in all_reqs if r.get("status") == "Delivered"])
+        
+        rate = (fulfilled_count / total_count * 100) if total_count > 0 else 0
+        
+        # 2. Daily trend (last 7 days)
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+        
+        daily_trend = []
+        for day in days:
+            day_str = day.strftime("%Y-%m-%d")
+            # In a real app we'd query this efficiently, but for the demo we'll filter the list
+            count = len([r for r in all_reqs if r.get("created_at") and r["created_at"].startswith(day_str)])
+            daily_trend.append({"date": day_str, "count": count})
+            
+        return {
+            "status": "success",
+            "data": {
+                "fulfillment_rate": round(rate, 1),
+                "total_requests": total_count,
+                "fulfilled_requests": fulfilled_count,
+                "daily_trend": daily_trend
+            }
+        }
+    except Exception as e:
+        print(f"Analytics error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

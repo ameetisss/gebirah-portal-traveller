@@ -117,3 +117,23 @@ class ItemRequestPatchRequest(BaseModel):
     delivery_proof: Optional[dict] = None
     deliveredLabel: Optional[str] = None
     routeLabel: Optional[str] = None
+
+class ActivityLog(BaseModel):
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    action: str
+    entity_type: str
+    entity_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ActivityLogCreate(BaseModel):
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    action: str
+    entity_type: str
+    entity_id: Optional[str] = None
+    metadata: Optional[dict] = None
