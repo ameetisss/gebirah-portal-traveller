@@ -26,7 +26,6 @@ export default function Topbar({
   logoColor = "#fff",
   avatarBg = theme.accent,
   avatarColor = "#fff",
-  travellerProgress = null,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,29 +111,6 @@ export default function Topbar({
 
       {/* Right Side Controls */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        {travellerProgress && (
-          <div style={{
-            minWidth: "248px",
-            padding: "8px 12px",
-            borderRadius: "999px",
-            background: "#FFFFFF",
-            border: `1px solid ${theme.border}`,
-            boxShadow: "0 6px 18px rgba(46, 35, 19, 0.05)",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "5px" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: theme.accent, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                {travellerProgress.title}
-              </span>
-              <span style={{ fontSize: "11px", color: theme.textSecondary }}>
-                {travellerProgress.nextLabel}
-              </span>
-            </div>
-            <div style={{ height: "5px", borderRadius: "999px", background: theme.border, overflow: "hidden", marginBottom: "4px" }}>
-              <div style={{ width: `${travellerProgress.progressPct}%`, height: "100%", background: theme.accent, borderRadius: "999px", transition: "width 0.25s ease" }} />
-            </div>
-            <div style={{ fontSize: "11px", color: theme.textTertiary }}>{travellerProgress.currentLabel}</div>
-          </div>
-        )}
 
         {/* User chip */}
         <div 

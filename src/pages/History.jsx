@@ -22,7 +22,7 @@ export default function History() {
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif", fontSize: "14px", lineHeight: "1.5",
     }}>
       {selectedTrip && <TripDetailModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} />}
-      <Topbar travellerProgress={travellerLevel} />
+      <Topbar />
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
         <div style={{ maxWidth: "560px" }}>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
-import { Card, CardHeader, Badge, StatusDot, FieldLabel } from "../components/UIKit";
+import { Card, CardHeader, Badge, StatusDot, FieldLabel, TravellerLevelProgress } from "../components/UIKit";
 import { theme, btn, inputStyle } from "../theme";
 import { useTrip, STAGES, DEMO_HANDOVER } from "../context/TripContext";
 import { useAuth } from "../context/AuthContext";
@@ -160,16 +160,19 @@ export default function Dashboard() {
         />
       )}
 
-      <Topbar travellerProgress={travellerLevel} />
+      <Topbar />
 
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "36px 28px" }}>
 
         {/* Page header */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "22px", fontWeight: "600", letterSpacing: "-0.5px", marginBottom: "4px" }}>
-            Good morning, {userName}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "28px" }}>
+          <div>
+            <div style={{ fontSize: "22px", fontWeight: "600", letterSpacing: "-0.5px", marginBottom: "4px" }}>
+              Good morning, {userName}
+            </div>
+            <div style={{ fontSize: "13px", color: theme.textSecondary }}>{subtitle}</div>
           </div>
-          <div style={{ fontSize: "13px", color: theme.textSecondary }}>{subtitle}</div>
+          <TravellerLevelProgress progress={travellerLevel} />
         </div>
 
         {/* Metrics */}

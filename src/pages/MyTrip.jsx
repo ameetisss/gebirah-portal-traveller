@@ -599,7 +599,7 @@ export default function MyTrip() {
         />
       )}
 
-      <Topbar travellerProgress={travellerLevel} />
+      <Topbar />
 
       {/* Trip tab strip */}
       {trips.length > 0 && (

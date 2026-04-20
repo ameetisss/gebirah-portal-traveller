@@ -101,3 +101,31 @@ export function LoadingState() {
     </div>
   );
 }
+
+export function TravellerLevelProgress({ progress, style }) {
+  if (!progress) return null;
+  return (
+    <div style={{
+      minWidth: "248px",
+      padding: "8px 12px",
+      borderRadius: "999px",
+      background: "#FFFFFF",
+      border: `1px solid ${theme.border}`,
+      boxShadow: "0 6px 18px rgba(46, 35, 19, 0.05)",
+      ...style
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "5px" }}>
+        <span style={{ fontSize: "11px", fontWeight: "700", color: theme.accent, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          {progress.title}
+        </span>
+        <span style={{ fontSize: "11px", color: theme.textSecondary }}>
+          {progress.nextLabel}
+        </span>
+      </div>
+      <div style={{ height: "5px", borderRadius: "999px", background: theme.border, overflow: "hidden", marginBottom: "4px" }}>
+        <div style={{ width: `${progress.progressPct}%`, height: "100%", background: theme.accent, borderRadius: "999px", transition: "width 0.25s ease" }} />
+      </div>
+      <div style={{ fontSize: "11px", color: theme.textTertiary }}>{progress.currentLabel}</div>
+    </div>
+  );
+}
