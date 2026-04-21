@@ -81,7 +81,7 @@ export function TripProvider({ children }) {
             matchData: t.match_data,
             arrivalData: t.arrival_data,
             candidateMatches: t.candidate_matches,
-            travellerName: t.user_profiles?.full_name || "Traveller",
+            travellerName: t.user_profiles?.full_name || "User",
             ...t
           }));
           

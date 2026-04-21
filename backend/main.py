@@ -122,7 +122,7 @@ async def login(request: LoginRequest):
                 "role": request.role or "traveller",
                 "email": request.email,
                 "phone": request.phone,
-                "full_name": request.email.split("@")[0] if request.email else (request.role or "User")
+                "full_name": request.email.split("@")[0] if request.email else "User"
             }
             res_insert = supabase.table("user_profiles").insert(new_user).execute()
             if res_insert.data:

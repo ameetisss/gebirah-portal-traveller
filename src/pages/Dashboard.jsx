@@ -333,7 +333,7 @@ export default function Dashboard() {
                             </div>
                             <button style={{ ...btn("primary"), width: "100%", padding: "8px", fontSize: "12px" }}
                               onClick={() => setStageForTrip(trip.id, STAGES.ARRIVAL)}>
-                              I've landed \u2014 start arrival handover
+                              I've landed  start arrival handover
                             </button>
                           </>
                         )}

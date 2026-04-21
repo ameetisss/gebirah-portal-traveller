@@ -53,7 +53,7 @@ export default function GebirahHandovers() {
                         {handover.volunteer || "Unassigned"} (Volunteer)
                       </Badge>
                       <Badge bg="#E3F2FD" color="#1976D2">
-                        {trip.travellerName || trip.traveller_name || "Traveller"}
+                        {trip.travellerName || trip.traveller_name || "User"}
                       </Badge>
                       {isDispatched && (
                         <Badge bg="#FFF9C4" color="#FBC02D">Brief Dispatched</Badge>

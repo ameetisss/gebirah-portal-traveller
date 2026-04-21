@@ -69,9 +69,9 @@ export function VolunteerProvider({ children }) {
       handoverTime:     data.handoverTime || "TBD",
       
       // Traveller info defaults
-      traveller:         data.traveller || "Traveller",
+      traveller:         data.traveller || "User",
       travellerPhone:    data.travellerPhone || "N/A",
-      travellerInitials: data.travellerInitials || (data.traveller ? data.traveller.split(' ').map(n => n[0]).join('').toUpperCase() : "T"),
+      travellerInitials: data.travellerInitials || (data.traveller ? data.traveller.split(' ').map(n => n[0]).join('').toUpperCase() : "U"),
 
       // Fields for History and Dashboard
       kg:                data.kg || data.totalWeight || data.total_weight || 0,
